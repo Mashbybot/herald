@@ -1,0 +1,5 @@
+nextcord
+python-dotenv
+# Add later for expansion
+# pyparsing
+# sqlalchemy
