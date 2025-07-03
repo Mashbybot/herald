@@ -11,17 +11,14 @@ async def on_ready():
     print(f"Bot is live as {bot.user}")
     init_db()
     try:
-        guild = discord.Object(id=1388201771532554390)
+        guild = discord.Object(id=1388201771532554390)  # Replace with your actual guild ID
         synced = await bot.tree.sync(guild=guild)
         print(f"🔁 Synced {len(synced)} commands to guild {guild.id}")
     except Exception as e:
         print(f"❌ Error syncing commands: {e}")
 
-async def main():
-    await bot.load_extension("cogs.roll")
-    await bot.load_extension("cogs.character")
-    await bot.start(DISCORD_TOKEN)
+# Load cogs
+bot.load_extension("cogs.roll")
+bot.load_extension("cogs.character")
 
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+bot.run(DISCORD_TOKEN)

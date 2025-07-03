@@ -10,15 +10,21 @@ def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Basic character sheet structure — expand as needed
+    # Character sheet schema matching Hunter v5 attributes
     cur.execute("""
     CREATE TABLE IF NOT EXISTS characters (
-        id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id TEXT NOT NULL,
         name TEXT NOT NULL,
-        attributes TEXT,  -- JSON string for now
-        skills TEXT,
-        edges TEXT
+        strength INTEGER DEFAULT 1,
+        dexterity INTEGER DEFAULT 1,
+        stamina INTEGER DEFAULT 1,
+        charisma INTEGER DEFAULT 1,
+        manipulation INTEGER DEFAULT 1,
+        composure INTEGER DEFAULT 1,
+        intelligence INTEGER DEFAULT 1,
+        wits INTEGER DEFAULT 1,
+        resolve INTEGER DEFAULT 1
     );
     """)
     conn.commit()
