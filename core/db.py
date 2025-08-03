@@ -24,8 +24,22 @@ def init_db():
         composure INTEGER DEFAULT 1,
         intelligence INTEGER DEFAULT 1,
         wits INTEGER DEFAULT 1,
-        resolve INTEGER DEFAULT 1
+        resolve INTEGER DEFAULT 1,
+        health INTEGER DEFAULT 0,
+        willpower INTEGER DEFAULT 0
     );
     """)
+
+    # Skills table
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS skills (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        character_name TEXT NOT NULL,
+        skill_name TEXT NOT NULL,
+        dots INTEGER DEFAULT 0
+    );
+    """)
+
     conn.commit()
     conn.close()
