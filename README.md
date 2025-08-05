@@ -1,5 +1,3 @@
-
-```markdown
 # Herald
 ### *Discord Bot for Hunter: The Reckoning 5th Edition*
 
@@ -127,4 +125,3 @@ Hunter: The Reckoning 5th Edition is a tabletop RPG published by Modiphius Enter
 *Hunt the monsters that prey upon humanity*
 
 </div>
-```
