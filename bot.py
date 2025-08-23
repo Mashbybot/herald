@@ -4,7 +4,6 @@ from discord.ext import commands
 from config.settings import DISCORD_TOKEN, GUILD_ID, DEBUG_MODE
 from core.db import init_db
 
-# TODO: Add file logging later - for now console output is sufficient
 # Configure clean logging
 def setup_logging():
     """Configure logging with clean, minimal output"""
@@ -38,88 +37,135 @@ def setup_logging():
     
     # Keep Herald logs at INFO level
     logging.getLogger('Herald').setLevel(logging.INFO)
-    logging.getLogger('Herald.Database').setLevel(logging.INFO)
-    logging.getLogger('Herald.Character').setLevel(logging.INFO)
 
-# Initialize logging and create logger
-setup_logging()
-logger = logging.getLogger('Herald.Bot')
 
-# Bot setup
-intents = discord.Intents.default()
-bot = commands.Bot(command_prefix="!", intents=intents)
-has_synced = False  # Flag to ensure syncing happens only once
-
-@bot.event
-async def on_ready():
-    """Bot startup event handler"""
-    global has_synced
-    logger.info(f"Bot is live as {bot.user}")
+class HeraldBot(commands.Bot):
+    """Herald - Hunter: The Reckoning 5E Discord Bot"""
     
-    # Initialize database
-    try:
-        init_db()
-        logger.info("Database initialized successfully")
-    except Exception as e:
-        logger.error(f"Failed to initialize database: {e}")
-        return
-    
-    # Sync commands (guild-specific for development, global for production)
-    if not has_synced:
+    def __init__(self):
+        # Set up intents
+        intents = discord.Intents.default()
+        intents.message_content = True  # Required for message content access
+        
+        super().__init__(
+            command_prefix='!',  # Legacy prefix (slash commands are primary)
+            intents=intents,
+            help_command=None  # Disable default help (we have custom /help)
+        )
+        
+        self.logger = logging.getLogger('Herald.Bot')
+
+    async def setup_hook(self):
+        """Called when the bot is starting up"""
+        self.logger.info("Starting Herald bot setup...")
+        
+        # Initialize database
         try:
-            await bot.application_info()  # Ensure application_id is set
-            
+            init_db()
+            self.logger.info("Database initialized successfully")
+        except Exception as e:
+            self.logger.error(f"Database initialization failed: {e}")
+            raise
+        
+        # Load all cogs
+        cogs_to_load = [
+            'cogs.character_management',
+            'cogs.character_gameplay', 
+            'cogs.character_progression',
+            'cogs.character_inventory',
+            # Add other cogs here as you create them:
+            # 'cogs.dice_rolling',
+            # 'cogs.game_master',
+            # etc.
+        ]
+        
+        loaded_cogs = 0
+        failed_cogs = 0
+        
+        for cog in cogs_to_load:
+            try:
+                await self.load_extension(cog)
+                self.logger.info(f"✅ Loaded {cog}")
+                loaded_cogs += 1
+            except Exception as e:
+                self.logger.error(f"❌ Failed to load {cog}: {e}")
+                failed_cogs += 1
+        
+        self.logger.info(f"Cog loading complete: {loaded_cogs} loaded, {failed_cogs} failed")
+        
+        # Sync commands
+        try:
             if GUILD_ID:
-                # Development: Fast guild-specific syncing
+                # Development mode - sync to specific guild (faster)
                 guild = discord.Object(id=GUILD_ID)
-                synced = await bot.tree.sync(guild=guild)
-                logger.info(f"Synced {len(synced)} commands to development guild {guild.id}")
+                self.tree.copy_global_to(guild=guild)
+                synced = await self.tree.sync(guild=guild)
+                self.logger.info(f"⚡ Synced {len(synced)} commands to development guild {GUILD_ID}")
             else:
-                # Production: Global syncing (takes up to 1 hour to propagate)
-                synced = await bot.tree.sync()
-                logger.info(f"Synced {len(synced)} commands globally (may take up to 1 hour)")
-                
-            has_synced = True
+                # Production mode - sync globally (slower, up to 1 hour)
+                synced = await self.tree.sync()
+                self.logger.info(f"🌍 Synced {len(synced)} commands globally (may take up to 1 hour to appear)")
         except Exception as e:
-            logger.error(f"Error syncing commands: {e}")
+            self.logger.error(f"❌ Command sync failed: {e}")
 
-@bot.event
-async def on_interaction(interaction: discord.Interaction):
-    """Debug interaction logging"""
-    if DEBUG_MODE:
-        logger.debug(f"Received interaction: {interaction.data}")
+    async def on_ready(self):
+        """Called when the bot has successfully connected to Discord"""
+        self.logger.info(f"🏹 {self.user} has connected to Discord!")
+        self.logger.info(f"Bot ID: {self.user.id}")
+        self.logger.info(f"Guilds: {len(self.guilds)}")
+        self.logger.info(f"Users: {len(set(self.get_all_members()))}")
+        
+        # Set bot status
+        activity = discord.Activity(
+            type=discord.ActivityType.playing,
+            name="Hunter: The Reckoning 5E | /help"
+        )
+        await self.change_presence(activity=activity)
 
-async def load_cogs():
-    """Load all bot cogs with error handling"""
-    cogs = [
-        "cogs.roll",
-        "cogs.character"
-    ]
-    
-    for cog in cogs:
+    async def on_app_command_error(self, interaction: discord.Interaction, error: Exception):
+        """Global error handler for slash commands"""
+        self.logger.error(f"Command error in {interaction.command}: {error}")
+        
+        # Try to respond to the user
         try:
-            logger.info(f"Loading {cog}")
-            await bot.load_extension(cog)
-            logger.info(f"✅ {cog} loaded successfully")
-        except Exception as e:
-            logger.error(f"❌ Failed to load {cog}: {e}")
-            raise  # Exit completely if any cog fails to load
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "❌ An error occurred while processing your command. Please try again.", 
+                    ephemeral=True
+                )
+            else:
+                await interaction.followup.send(
+                    "❌ An error occurred while processing your command. Please try again.", 
+                    ephemeral=True
+                )
+        except:
+            # If we can't respond, just log it
+            self.logger.error(f"Could not send error message to user for command {interaction.command}")
 
-async def main():
-    """Main bot startup function"""
-    logger.info("Starting Herald bot...")
+    async def on_guild_join(self, guild):
+        """Called when the bot joins a new guild"""
+        self.logger.info(f"🎉 Joined new guild: {guild.name} (ID: {guild.id})")
+
+    async def on_guild_remove(self, guild):
+        """Called when the bot leaves a guild"""
+        self.logger.info(f"👋 Left guild: {guild.name} (ID: {guild.id})")
+
+
+def main():
+    """Main entry point"""
+    # Set up logging first
+    setup_logging()
+    
+    # Create and run bot
+    bot = HeraldBot()
     
     try:
-        await load_cogs()
-        await bot.start(DISCORD_TOKEN)
-    except KeyboardInterrupt:
-        logger.info("Bot shutdown requested")
+        bot.run(DISCORD_TOKEN)
+    except discord.LoginFailure:
+        logging.getLogger('Herald.Bot').error("❌ Invalid Discord token. Check your settings.")
     except Exception as e:
-        logger.error(f"Fatal error starting bot: {e}")
-        raise
-    finally:
-        await bot.close()
+        logging.getLogger('Herald.Bot').error(f"❌ Bot startup failed: {e}")
 
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+
+if __name__ == '__main__':
+    main()
