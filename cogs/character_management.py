@@ -11,9 +11,10 @@ import logging
 
 from core.db import get_db_connection
 from core.character_utils import (
-    find_character, character_autocomplete, damage_bar, willpower_bar,
-    get_character_and_skills, ensure_h5e_columns, ALL_SKILLS, H5E_SKILLS
+    find_character, character_autocomplete, get_character_and_skills, 
+    ensure_h5e_columns, ALL_SKILLS, H5E_SKILLS, HeraldMessages
 )
+from core.ui_utils import create_health_bar, create_willpower_bar
 from config.settings import GUILD_ID
 
 logger = logging.getLogger('Herald.Character.Management')
@@ -473,9 +474,9 @@ class CharacterManagement(commands.Cog):
 
             # Health, Willpower, and Edge displayed vertically
             # Health: max possible is 8 (5 stamina + 3)
-            health_bar = damage_bar(character['health'], character['health_sup'], character['health_agg'], 8)
+            health_bar = create_health_bar(character['health'], character['health_sup'], character['health_agg'], 8)
             # Willpower: max possible is 10 (5 resolve + 5 composure)  
-            willpower_display = willpower_bar(character['willpower'], character['willpower_sup'], character['willpower_agg'], 10)
+            willpower_display = create_willpower_bar(character['willpower'], character['willpower_sup'], character['willpower_agg'], 10)
             
             # Edge formatting with black squares for empty
             edge = safe_get_character_field(character, 'edge', 0)

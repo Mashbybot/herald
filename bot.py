@@ -73,6 +73,7 @@ class HeraldBot(commands.Bot):
             'cogs.character_gameplay', 
             'cogs.character_progression',
             'cogs.character_inventory',
+            'cogs.dice_rolling',
             # Add other cogs here as you create them:
             # 'cogs.dice_rolling',
             # 'cogs.game_master',

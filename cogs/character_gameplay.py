@@ -11,8 +11,12 @@ import logging
 
 from core.db import get_db_connection
 from core.character_utils import (
-    find_character, character_autocomplete, damage_bar, willpower_bar,
-    get_character_and_skills, ensure_h5e_columns, ALL_SKILLS, H5E_SKILLS
+    find_character, character_autocomplete, get_character_and_skills,
+    ensure_h5e_columns, ALL_SKILLS, H5E_SKILLS, HeraldMessages
+)
+from core.ui_utils import (
+    HeraldEmojis, create_health_bar, create_willpower_bar,
+    create_edge_bar, create_desperation_bar
 )
 from config.settings import GUILD_ID
 
@@ -71,7 +75,10 @@ class CharacterGameplay(commands.Cog):
         user_id = str(interaction.user.id)
         
         if amount < 1:
-            await interaction.response.send_message("❌ Damage amount must be positive", ephemeral=True)
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Damage amount must be positive", 
+                ephemeral=True
+            )
             return
 
         try:
@@ -79,7 +86,8 @@ class CharacterGameplay(commands.Cog):
             char = await find_character(user_id, character)
             
             if not char:
-                await interaction.response.send_message(f"⚠️ Character **{character}** not found", ephemeral=True)
+                error_msg = await HeraldMessages.character_not_found(user_id, character)
+                await interaction.response.send_message(error_msg, ephemeral=True)
                 return
 
             # Determine fields to update
@@ -89,14 +97,14 @@ class CharacterGameplay(commands.Cog):
                 agg_field = 'health_agg'
                 current_sup = char['health_sup']
                 current_agg = char['health_agg']
-                track_emoji = "💚"
+                track_emoji = HeraldEmojis.HEALTH_FULL
             else:  # willpower
                 max_track = char['willpower']
                 sup_field = 'willpower_sup'
                 agg_field = 'willpower_agg'
                 current_sup = char['willpower_sup']
                 current_agg = char['willpower_agg']
-                track_emoji = "🧠"
+                track_emoji = HeraldEmojis.WILLPOWER_FULL
 
             # Calculate new damage totals
             if damage_type == "superficial":
@@ -115,39 +123,48 @@ class CharacterGameplay(commands.Cog):
             conn.commit()
             conn.close()
 
-            # Create response
+            # Create response with proper display functions
             remaining = max_track - new_sup - new_agg
             if track == "health":
                 damage_bar_display = create_health_bar(max_track, new_sup, new_agg, 8)
-                track_emoji = HeraldEmojis.HEALTH_FULL
             else:
-                damage_bar_display = create_willpower_bar(max_track, new_sup, new_agg, 10) 
-                track_emoji = HeraldEmojis.WILLPOWER_FULL
+                damage_bar_display = create_willpower_bar(max_track, new_sup, new_agg, 10)
             
             embed = discord.Embed(
-                title=f"💥 Damage Applied",
+                title=f"{HeraldEmojis.CRITICAL} Damage Applied",
                 description=f"**{char['name']}** takes {amount} {damage_type} {track} damage",
                 color=0x8B0000
             )
             
             embed.add_field(
                 name=f"{track_emoji} {track.title()}",
-                value=f"{damage_bar_display}\n{remaining}/{max_track} remaining",
+                value=f"{damage_bar_display}\n`{remaining}/{max_track} remaining`",
                 inline=False
             )
 
             if remaining == 0:
                 if track == "health":
-                    embed.add_field(name="💀 Incapacitated!", value="Character is unconscious and dying", inline=False)
+                    embed.add_field(
+                        name=f"{HeraldEmojis.WARNING} Incapacitated!",
+                        value="Character is unconscious and dying",
+                        inline=False
+                    )
                 else:
-                    embed.add_field(name="😵 Willpower Broken!", value="Character cannot spend willpower", inline=False)
+                    embed.add_field(
+                        name=f"{HeraldEmojis.WARNING} Willpower Broken!",
+                        value="Character cannot spend willpower",
+                        inline=False
+                    )
 
             await interaction.response.send_message(embed=embed)
             logger.info(f"Applied {amount} {damage_type} {track} damage to {char['name']} for user {user_id}")
 
         except Exception as e:
             logger.error(f"Error applying damage: {e}")
-            await interaction.response.send_message(f"❌ Error applying damage: {str(e)}", ephemeral=True)
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Error applying damage: {str(e)}", 
+                ephemeral=True
+            )
 
     @app_commands.command(name="heal", description="Heal health or willpower damage from your character")
     @app_commands.describe(
@@ -179,7 +196,10 @@ class CharacterGameplay(commands.Cog):
         user_id = str(interaction.user.id)
         
         if amount < 1:
-            await interaction.response.send_message("❌ Heal amount must be positive", ephemeral=True)
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Heal amount must be positive", 
+                ephemeral=True
+            )
             return
 
         try:
@@ -187,7 +207,8 @@ class CharacterGameplay(commands.Cog):
             char = await find_character(user_id, character)
             
             if not char:
-                await interaction.response.send_message(f"⚠️ Character **{character}** not found", ephemeral=True)
+                error_msg = await HeraldMessages.character_not_found(user_id, character)
+                await interaction.response.send_message(error_msg, ephemeral=True)
                 return
 
             # Determine fields to update
@@ -197,14 +218,14 @@ class CharacterGameplay(commands.Cog):
                 agg_field = 'health_agg'
                 current_sup = char['health_sup']
                 current_agg = char['health_agg']
-                track_emoji = "💚"
+                track_emoji = HeraldEmojis.HEALTH_FULL
             else:  # willpower
                 max_track = char['willpower']
                 sup_field = 'willpower_sup'
                 agg_field = 'willpower_agg'  
                 current_sup = char['willpower_sup']
                 current_agg = char['willpower_agg']
-                track_emoji = "🧠"
+                track_emoji = HeraldEmojis.WILLPOWER_FULL
 
             # Calculate healing
             if heal_type == "all":
@@ -228,21 +249,24 @@ class CharacterGameplay(commands.Cog):
             conn.commit()
             conn.close()
 
-            # Create response
+            # Create response with proper display functions
             remaining = max_track - new_sup - new_agg
-            damage_bar_display = damage_bar(max_track, new_sup, new_agg, 8 if track == "health" else 10)
+            if track == "health":
+                damage_bar_display = create_health_bar(max_track, new_sup, new_agg, 8)
+            else:
+                damage_bar_display = create_willpower_bar(max_track, new_sup, new_agg, 10)
             
             heal_text = f"all damage" if heal_type == "all" else f"{healed_amount} {heal_type} damage"
             
             embed = discord.Embed(
-                title=f"✨ Healing Applied",
+                title=f"{HeraldEmojis.NEW} Healing Applied",
                 description=f"**{char['name']}** heals {heal_text}",
                 color=0x228B22
             )
             
             embed.add_field(
                 name=f"{track_emoji} {track.title()}",
-                value=f"{damage_bar_display}\n{remaining}/{max_track} remaining",
+                value=f"{damage_bar_display}\n`{remaining}/{max_track} remaining`",
                 inline=False
             )
 
@@ -251,7 +275,10 @@ class CharacterGameplay(commands.Cog):
 
         except Exception as e:
             logger.error(f"Error healing damage: {e}")
-            await interaction.response.send_message(f"❌ Error healing damage: {str(e)}", ephemeral=True)
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Error healing damage: {str(e)}", 
+                ephemeral=True
+            )
 
     @app_commands.command(name="edge", description="View or modify your character's Edge rating")
     @app_commands.describe(
@@ -273,7 +300,8 @@ class CharacterGameplay(commands.Cog):
         try:
             char = await find_character(user_id, character)
             if not char:
-                await interaction.response.send_message(f"⚠️ No character named **{character}** found", ephemeral=True)
+                error_msg = await HeraldMessages.character_not_found(user_id, character)
+                await interaction.response.send_message(error_msg, ephemeral=True)
                 return
             
             current_edge = safe_get_character_field(char, 'edge', 0)
@@ -281,10 +309,10 @@ class CharacterGameplay(commands.Cog):
             # Handle different actions
             if action == "view":
                 # Create edge display
-                edge_dots = "⚡" * current_edge + "○" * (5 - current_edge)
+                edge_dots = HeraldEmojis.EDGE * current_edge + HeraldEmojis.EDGE_EMPTY * (5 - current_edge)
                 
                 embed = discord.Embed(
-                    title=f"⚡ {char['name']}'s Edge",
+                    title=f"{HeraldEmojis.EDGE} {char['name']}'s Edge",
                     description=f"**Current Rating:** {current_edge}/5\n{edge_dots}",
                     color=0xFFD700 if current_edge >= 3 else 0x4169E1
                 )
@@ -292,7 +320,7 @@ class CharacterGameplay(commands.Cog):
                 # Add Edge benefits info
                 if current_edge > 0:
                     embed.add_field(
-                        name="💡 Edge Benefits", 
+                        name=f"{HeraldEmojis.INFO} Edge Benefits", 
                         value=f"• Add {current_edge} dice to Danger rolls\n• Enhanced supernatural resistance\n• Improved Hunter abilities", 
                         inline=False
                     )
@@ -302,7 +330,10 @@ class CharacterGameplay(commands.Cog):
             else:
                 # Actions that modify edge require amount
                 if amount is None:
-                    await interaction.response.send_message(f"⚠️ Amount required for **{action}** action", ephemeral=True)
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.WARNING} Amount required for **{action}** action", 
+                        ephemeral=True
+                    )
                     return
                 
                 # Calculate new edge
@@ -330,10 +361,10 @@ class CharacterGameplay(commands.Cog):
                 change = new_edge - current_edge
                 change_text = f"+{change}" if change > 0 else str(change) if change < 0 else "±0"
                 
-                edge_dots = "⚡" * new_edge + "○" * (5 - new_edge)
+                edge_dots = HeraldEmojis.EDGE * new_edge + HeraldEmojis.EDGE_EMPTY * (5 - new_edge)
                 
                 embed = discord.Embed(
-                    title=f"⚡ {char['name']}'s Edge Updated",
+                    title=f"{HeraldEmojis.EDGE} {char['name']}'s Edge Updated",
                     description=f"**{current_edge} → {new_edge}** ({change_text})\n{edge_dots}",
                     color=0xFFD700 if new_edge >= 3 else 0x4169E1
                 )
@@ -341,7 +372,7 @@ class CharacterGameplay(commands.Cog):
                 # Add note for significant changes
                 if new_edge > current_edge:
                     embed.add_field(
-                        name="📈 Edge Increased!", 
+                        name=f"{HeraldEmojis.NEW} Edge Increased!", 
                         value=f"Your character now adds {new_edge} dice to Danger rolls!", 
                         inline=False
                     )
@@ -350,7 +381,10 @@ class CharacterGameplay(commands.Cog):
                 
         except Exception as e:
             self.logger.error(f"Error in edge command: {e}")
-            await interaction.response.send_message("❌ An error occurred while managing Edge", ephemeral=True)
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} An error occurred while managing Edge", 
+                ephemeral=True
+            )
 
     @app_commands.command(name="desperation", description="View or modify your character's Desperation level")
     @app_commands.describe(
@@ -374,7 +408,8 @@ class CharacterGameplay(commands.Cog):
             char = await find_character(user_id, character)
             
             if not char:
-                await interaction.response.send_message(f"⚠️ No character named **{character}** found", ephemeral=True)
+                error_msg = await HeraldMessages.character_not_found(user_id, character)
+                await interaction.response.send_message(error_msg, ephemeral=True)
                 return
             
             current_desperation = safe_get_character_field(char, 'desperation', 0)
@@ -385,7 +420,7 @@ class CharacterGameplay(commands.Cog):
                 desperation_bar = create_desperation_bar(current_desperation)
                 
                 embed = discord.Embed(
-                    title=f"🌑 {char['name']}'s Desperation",
+                    title=f"{HeraldEmojis.DESPERATION} {char['name']}'s Desperation",
                     description=f"**Current Level:** {current_desperation}/10\n{desperation_bar}",
                     color=0x8B0000 if current_desperation >= 7 else 0xFF4500 if current_desperation >= 4 else 0x4169E1
                 )
@@ -393,7 +428,7 @@ class CharacterGameplay(commands.Cog):
                 # Add Desperation effects info
                 if current_desperation >= 7:
                     embed.add_field(
-                        name="⚠️ High Desperation Effects", 
+                        name=f"{HeraldEmojis.WARNING} High Desperation Effects", 
                         value="• Rolling Desperation dice on failed rolls\n• Increased supernatural vulnerability", 
                         inline=False
                     )
@@ -403,7 +438,10 @@ class CharacterGameplay(commands.Cog):
             else:
                 # Actions that modify desperation require amount
                 if amount is None:
-                    await interaction.response.send_message(f"⚠️ Amount required for **{action}** action", ephemeral=True)
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.WARNING} Amount required for **{action}** action", 
+                        ephemeral=True
+                    )
                     return
                 
                 # Calculate new desperation
@@ -434,7 +472,7 @@ class CharacterGameplay(commands.Cog):
                 desperation_bar = create_desperation_bar(new_desperation)
                 
                 embed = discord.Embed(
-                    title=f"🌑 {char['name']}'s Desperation Updated",
+                    title=f"{HeraldEmojis.DESPERATION} {char['name']}'s Desperation Updated",
                     description=f"**{current_desperation} → {new_desperation}** ({change_text})\n{desperation_bar}",
                     color=0x8B0000 if new_desperation >= 7 else 0xFF4500 if new_desperation >= 4 else 0x4169E1
                 )
@@ -442,7 +480,7 @@ class CharacterGameplay(commands.Cog):
                 # Add warning for high desperation
                 if new_desperation >= 7 and current_desperation < 7:
                     embed.add_field(
-                        name="⚠️ High Desperation!", 
+                        name=f"{HeraldEmojis.WARNING} High Desperation!", 
                         value="Your character is now rolling Desperation dice on failed rolls!", 
                         inline=False
                     )
@@ -451,7 +489,10 @@ class CharacterGameplay(commands.Cog):
                 
         except Exception as e:
             self.logger.error(f"Error in desperation command: {e}")
-            await interaction.response.send_message("❌ An error occurred while managing Desperation", ephemeral=True)
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} An error occurred while managing Desperation", 
+                ephemeral=True
+            )
 
     @app_commands.command(name="creed", description="View or set your character's Creed")
     @app_commands.describe(
@@ -468,7 +509,8 @@ class CharacterGameplay(commands.Cog):
             char = await find_character(user_id, character)
             
             if not char:
-                await interaction.response.send_message(f"⚠️ No character named **{character}** found", ephemeral=True)
+                error_msg = await HeraldMessages.character_not_found(user_id, character)
+                await interaction.response.send_message(error_msg, ephemeral=True)
                 return
             
             current_creed = char['creed']
@@ -476,22 +518,22 @@ class CharacterGameplay(commands.Cog):
             # If no creed provided, show current creed
             if creed is None:
                 embed = discord.Embed(
-                    title=f"🗡️ {char['name']}'s Creed",
+                    title=f"{HeraldEmojis.CREED} {char['name']}'s Creed",
                     color=0x8B4513
                 )
                 
                 if current_creed:
                     embed.description = f"**Current Creed:** {current_creed}"
                     embed.add_field(
-                        name="📜 About Creeds", 
+                        name=f"{HeraldEmojis.INFO} About Creeds", 
                         value="Creeds define your Hunter's philosophy and approach to the supernatural. They provide moral guidance and special abilities.", 
                         inline=False
                     )
                 else:
                     embed.description = "**No Creed set**"
                     embed.add_field(
-                        name="💡 Set a Creed", 
-                        value="Use `/creed <character> <creed_name>` to set your character's Creed.\n\nCommon Creeds: Innocent, Martyr, Redeemer, Visionary, Wayward", 
+                        name="Set a Creed", 
+                        value="Use `/creed character:Name creed:\"Creed Name\"` to set your character's Creed.\n\nCommon Creeds: Innocent, Martyr, Redeemer, Visionary, Wayward", 
                         inline=False
                     )
                 
@@ -514,21 +556,21 @@ class CharacterGameplay(commands.Cog):
                 
                 # Create response
                 embed = discord.Embed(
-                    title=f"🗡️ {char['name']}'s Creed Updated",
+                    title=f"{HeraldEmojis.CREED} {char['name']}'s Creed Updated",
                     color=0x8B4513
                 )
                 
                 if current_creed:
                     embed.description = f"**{current_creed}** → **{creed}**"
                     embed.add_field(
-                        name="🔄 Creed Changed", 
+                        name=f"{HeraldEmojis.NEW} Creed Changed", 
                         value=f"Your character has embraced the **{creed}** Creed!", 
                         inline=False
                     )
                 else:
                     embed.description = f"**Creed Set:** {creed}"
                     embed.add_field(
-                        name="✨ New Hunter", 
+                        name=f"{HeraldEmojis.NEW} New Hunter", 
                         value=f"Your character has joined the **{creed}** Creed and begins their hunt!", 
                         inline=False
                     )
@@ -537,7 +579,10 @@ class CharacterGameplay(commands.Cog):
                 
         except Exception as e:
             self.logger.error(f"Error in creed command: {e}")
-            await interaction.response.send_message("❌ An error occurred while managing Creed", ephemeral=True)
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} An error occurred while managing Creed", 
+                ephemeral=True
+            )
 
     @app_commands.command(name="ambition", description="View or set your character's Ambition")
     @app_commands.describe(
@@ -554,7 +599,8 @@ class CharacterGameplay(commands.Cog):
             char = await find_character(user_id, character)
             
             if not char:
-                await interaction.response.send_message(f"⚠️ No character named **{character}** found", ephemeral=True)
+                error_msg = await HeraldMessages.character_not_found(user_id, character)
+                await interaction.response.send_message(error_msg, ephemeral=True)
                 return
             
             current_ambition = char['ambition']
@@ -562,21 +608,21 @@ class CharacterGameplay(commands.Cog):
             # If no ambition provided, show current ambition
             if ambition is None:
                 embed = discord.Embed(
-                    title=f"🎯 {char['name']}'s Ambition",
+                    title=f"{HeraldEmojis.AMBITION} {char['name']}'s Ambition",
                     color=0xFFD700
                 )
                 
                 if current_ambition:
                     embed.description = f"**Current Ambition:** {current_ambition}"
                     embed.add_field(
-                        name="💡 About Ambitions", 
+                        name=f"{HeraldEmojis.INFO} About Ambitions", 
                         value="Ambitions are long-term goals. When you actively work towards your Ambition during a session, you recover **one point of Aggravated Willpower damage** at the end of the session.", 
                         inline=False
                     )
                 else:
                     embed.description = "**No Ambition set**"
                     embed.add_field(
-                        name="🎯 Set an Ambition", 
+                        name="Set an Ambition", 
                         value="Use `/ambition character:Name ambition:\"Your long-term goal\"` to set your character's Ambition.\n\nExamples: \"Destroy the vampire coven that killed my family\", \"Become the city's most feared supernatural hunter\", \"Find a cure for my cursed condition\"", 
                         inline=False
                     )
@@ -586,7 +632,10 @@ class CharacterGameplay(commands.Cog):
             else:
                 # Set new ambition
                 if len(ambition) > 200:
-                    await interaction.response.send_message("❌ Ambition must be 200 characters or less", ephemeral=True)
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Ambition must be 200 characters or less", 
+                        ephemeral=True
+                    )
                     return
                 
                 # Update database using actual character name
@@ -601,21 +650,21 @@ class CharacterGameplay(commands.Cog):
                 
                 # Create response
                 embed = discord.Embed(
-                    title=f"🎯 {char['name']}'s Ambition Updated",
+                    title=f"{HeraldEmojis.AMBITION} {char['name']}'s Ambition Updated",
                     color=0xFFD700
                 )
                 
                 if current_ambition:
                     embed.description = f"**Previous:** {current_ambition}\n**New:** {ambition}"
                     embed.add_field(
-                        name="🔄 Ambition Changed", 
+                        name=f"{HeraldEmojis.NEW} Ambition Changed", 
                         value="Your character's long-term goal has been updated!", 
                         inline=False
                     )
                 else:
                     embed.description = f"**Ambition Set:** {ambition}"
                     embed.add_field(
-                        name="✨ Goal Established", 
+                        name=f"{HeraldEmojis.NEW} Goal Established", 
                         value="Your character now has a driving long-term goal! Work towards this during sessions to recover Aggravated Willpower damage.", 
                         inline=False
                     )
@@ -624,7 +673,10 @@ class CharacterGameplay(commands.Cog):
                 
         except Exception as e:
             self.logger.error(f"Error in ambition command: {e}")
-            await interaction.response.send_message("❌ An error occurred while managing Ambition", ephemeral=True)
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} An error occurred while managing Ambition", 
+                ephemeral=True
+            )
 
     @app_commands.command(name="desire", description="View or set your character's Desire")
     @app_commands.describe(
@@ -641,7 +693,8 @@ class CharacterGameplay(commands.Cog):
             char = await find_character(user_id, character)
             
             if not char:
-                await interaction.response.send_message(f"⚠️ No character named **{character}** found", ephemeral=True)
+                error_msg = await HeraldMessages.character_not_found(user_id, character)
+                await interaction.response.send_message(error_msg, ephemeral=True)
                 return
             
             current_desire = char['desire']
@@ -649,21 +702,21 @@ class CharacterGameplay(commands.Cog):
             # If no desire provided, show current desire
             if desire is None:
                 embed = discord.Embed(
-                    title=f"💭 {char['name']}'s Desire",
+                    title=f"{HeraldEmojis.DESIRE} {char['name']}'s Desire",
                     color=0x4169E1
                 )
                 
                 if current_desire:
                     embed.description = f"**Current Desire:** {current_desire}"
                     embed.add_field(
-                        name="💡 About Desires", 
+                        name=f"{HeraldEmojis.INFO} About Desires", 
                         value="Desires are short-term goals or momentary wants. When you accomplish your Desire during a session, you **immediately recover one point of spent or damaged Superficial Willpower**. You can change your Desire each session.", 
                         inline=False
                     )
                 else:
                     embed.description = "**No Desire set**"
                     embed.add_field(
-                        name="💭 Set a Desire", 
+                        name="Set a Desire", 
                         value="Use `/desire character:Name desire:\"Your short-term goal\"` to set your character's Desire.\n\nExamples: \"Get information from the bartender\", \"Avoid getting noticed by the police\", \"Find a safe place to rest\"", 
                         inline=False
                     )
@@ -673,7 +726,10 @@ class CharacterGameplay(commands.Cog):
             else:
                 # Set new desire
                 if len(desire) > 200:
-                    await interaction.response.send_message("❌ Desire must be 200 characters or less", ephemeral=True)
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Desire must be 200 characters or less", 
+                        ephemeral=True
+                    )
                     return
                 
                 # Update database using actual character name
@@ -688,21 +744,21 @@ class CharacterGameplay(commands.Cog):
                 
                 # Create response
                 embed = discord.Embed(
-                    title=f"💭 {char['name']}'s Desire Updated",
+                    title=f"{HeraldEmojis.DESIRE} {char['name']}'s Desire Updated",
                     color=0x4169E1
                 )
                 
                 if current_desire:
                     embed.description = f"**Previous:** {current_desire}\n**New:** {desire}"
                     embed.add_field(
-                        name="🔄 Desire Changed", 
+                        name=f"{HeraldEmojis.NEW} Desire Changed", 
                         value="Your character's immediate goal has been updated!", 
                         inline=False
                     )
                 else:
                     embed.description = f"**Desire Set:** {desire}"
                     embed.add_field(
-                        name="✨ Goal Established", 
+                        name=f"{HeraldEmojis.NEW} Goal Established", 
                         value="Your character now has a short-term goal! Accomplish this during the session to recover Superficial Willpower damage.", 
                         inline=False
                     )
@@ -711,7 +767,10 @@ class CharacterGameplay(commands.Cog):
                 
         except Exception as e:
             self.logger.error(f"Error in desire command: {e}")
-            await interaction.response.send_message("❌ An error occurred while managing Desire", ephemeral=True)
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} An error occurred while managing Desire", 
+                ephemeral=True
+            )
 
     @app_commands.command(name="drive", description="View or set your character's Drive and Redemption")
     @app_commands.describe(
@@ -729,7 +788,8 @@ class CharacterGameplay(commands.Cog):
             char = await find_character(user_id, character)
             
             if not char:
-                await interaction.response.send_message(f"⚠️ No character named **{character}** found", ephemeral=True)
+                error_msg = await HeraldMessages.character_not_found(user_id, character)
+                await interaction.response.send_message(error_msg, ephemeral=True)
                 return
             
             current_drive = char['drive']
@@ -738,26 +798,34 @@ class CharacterGameplay(commands.Cog):
             # If no drive provided, show current drive and redemption
             if drive is None:
                 embed = discord.Embed(
-                    title=f"🔥 {char['name']}'s Drive",
+                    title=f"{HeraldEmojis.DRIVE} {char['name']}'s Drive",
                     color=0x8B0000
                 )
                 
                 if current_drive:
                     embed.description = f"**Current Drive:** {current_drive}"
                     if current_redemption:
-                        embed.add_field(name="🕊️ Redemption", value=current_redemption, inline=False)
+                        embed.add_field(
+                            name=f"{HeraldEmojis.REDEMPTION} Redemption", 
+                            value=current_redemption, 
+                            inline=False
+                        )
                     else:
-                        embed.add_field(name="💡 Set Redemption", value="Use `/drive character:Name redemption:\"Method to heal from Despair\"` to set your Redemption path.", inline=False)
+                        embed.add_field(
+                            name="Set Redemption", 
+                            value="Use `/drive character:Name redemption:\"Method to heal from Despair\"` to set your Redemption path.", 
+                            inline=False
+                        )
                     
                     embed.add_field(
-                        name="💡 About Drive & Redemption", 
+                        name=f"{HeraldEmojis.INFO} About Drive & Redemption", 
                         value="Drive represents your reason for hunting the supernatural. Redemption is the specific method that can heal you from Despair when you reach maximum Desperation.", 
                         inline=False
                     )
                 else:
                     embed.description = "**No Drive set**"
                     embed.add_field(
-                        name="🔥 Set a Drive", 
+                        name="Set a Drive", 
                         value="Use `/drive character:Name drive:\"Your reason for hunting\"` to set your character's Drive.\n\nExamples: \"Revenge against those who killed my family\", \"Protect the innocent from supernatural threats\", \"Prove that monsters are real\"", 
                         inline=False
                     )
@@ -767,11 +835,17 @@ class CharacterGameplay(commands.Cog):
             else:
                 # Set new drive and/or redemption
                 if len(drive) > 200:
-                    await interaction.response.send_message("❌ Drive must be 200 characters or less", ephemeral=True)
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Drive must be 200 characters or less", 
+                        ephemeral=True
+                    )
                     return
                 
                 if redemption and len(redemption) > 200:
-                    await interaction.response.send_message("❌ Redemption must be 200 characters or less", ephemeral=True)
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Redemption must be 200 characters or less", 
+                        ephemeral=True
+                    )
                     return
                 
                 # Update database using actual character name
@@ -797,7 +871,7 @@ class CharacterGameplay(commands.Cog):
                 
                 # Create response
                 embed = discord.Embed(
-                    title=f"🔥 {char['name']}'s Drive Updated",
+                    title=f"{HeraldEmojis.DRIVE} {char['name']}'s Drive Updated",
                     color=0x8B0000
                 )
                 
@@ -807,10 +881,14 @@ class CharacterGameplay(commands.Cog):
                     embed.description = f"**Drive Set:** {drive}"
                 
                 if redemption:
-                    embed.add_field(name="🕊️ Redemption Set", value=redemption, inline=False)
+                    embed.add_field(
+                        name=f"{HeraldEmojis.REDEMPTION} Redemption Set", 
+                        value=redemption, 
+                        inline=False
+                    )
                 
                 embed.add_field(
-                    name="✨ Hunter's Purpose", 
+                    name=f"{HeraldEmojis.NEW} Hunter's Purpose", 
                     value="Your character's motivation for hunting the supernatural has been established! This Drive will guide their actions and determine their path to Redemption.", 
                     inline=False
                 )
@@ -819,7 +897,10 @@ class CharacterGameplay(commands.Cog):
                 
         except Exception as e:
             self.logger.error(f"Error in drive command: {e}")
-            await interaction.response.send_message("❌ An error occurred while managing Drive", ephemeral=True)
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} An error occurred while managing Drive", 
+                ephemeral=True
+            )
 
     # Integration methods for roll cog
     async def get_character_attribute(self, user_id: str, character_name: str, attribute: str) -> Optional[int]:
@@ -853,7 +934,7 @@ class CharacterGameplay(commands.Cog):
             logger.error(f"Error getting skill {skill_name}: {e}")
             return None
 
-    # Autocomplete functions
+    # Autocomplete functions for character names
     @apply_damage.autocomplete('character')
     @heal_damage.autocomplete('character')
     @edge.autocomplete('character')
