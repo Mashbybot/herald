@@ -1,14 +1,15 @@
 import discord
 import logging
+import asyncio
 from discord.ext import commands
 from config.settings import DISCORD_TOKEN, GUILD_ID, DEBUG_MODE
 from core.db import init_db
 
-# Configure clean logging
+# Configure logging for production
 def setup_logging():
-    """Configure logging with clean, minimal output"""
+    """Configure logging for production environment"""
     
-    # Create formatter for clean output
+    # Clean formatter
     formatter = logging.Formatter(
         '%(asctime)s | %(name)-12s | %(levelname)-7s | %(message)s',
         datefmt='%H:%M:%S'
@@ -40,7 +41,7 @@ def setup_logging():
 
 
 class HeraldBot(commands.Bot):
-    """Herald - Hunter: The Reckoning 5E Discord Bot"""
+    """Herald - Hunter: The Reckoning 5E Discord Bot - Production Ready"""
     
     def __init__(self):
         # Set up intents
@@ -57,14 +58,14 @@ class HeraldBot(commands.Bot):
 
     async def setup_hook(self):
         """Called when the bot is starting up"""
-        self.logger.info("Starting Herald bot setup...")
+        self.logger.info("🏹 Starting Herald bot setup...")
         
         # Initialize database
         try:
             init_db()
-            self.logger.info("Database initialized successfully")
+            self.logger.info("✅ Database initialized successfully")
         except Exception as e:
-            self.logger.error(f"Database initialization failed: {e}")
+            self.logger.error(f"❌ Database initialization failed: {e}")
             raise
         
         # Load all cogs
@@ -74,10 +75,6 @@ class HeraldBot(commands.Bot):
             'cogs.character_progression',
             'cogs.character_inventory',
             'cogs.dice_rolling',
-            # Add other cogs here as you create them:
-            # 'cogs.dice_rolling',
-            # 'cogs.game_master',
-            # etc.
         ]
         
         loaded_cogs = 0
@@ -92,7 +89,7 @@ class HeraldBot(commands.Bot):
                 self.logger.error(f"❌ Failed to load {cog}: {e}")
                 failed_cogs += 1
         
-        self.logger.info(f"Cog loading complete: {loaded_cogs} loaded, {failed_cogs} failed")
+        self.logger.info(f"📦 Cog loading complete: {loaded_cogs} loaded, {failed_cogs} failed")
         
         # Sync commands
         try:
@@ -112,9 +109,9 @@ class HeraldBot(commands.Bot):
     async def on_ready(self):
         """Called when the bot has successfully connected to Discord"""
         self.logger.info(f"🏹 {self.user} has connected to Discord!")
-        self.logger.info(f"Bot ID: {self.user.id}")
-        self.logger.info(f"Guilds: {len(self.guilds)}")
-        self.logger.info(f"Users: {len(set(self.get_all_members()))}")
+        self.logger.info(f"🆔 Bot ID: {self.user.id}")
+        self.logger.info(f"🏰 Guilds: {len(self.guilds)}")
+        self.logger.info(f"👥 Users: {len(set(self.get_all_members()))}")
         
         # Set bot status
         activity = discord.Activity(
@@ -122,48 +119,56 @@ class HeraldBot(commands.Bot):
             name="Hunter: The Reckoning 5E | /help"
         )
         await self.change_presence(activity=activity)
+        self.logger.info("🎯 Bot status set and ready for commands")
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: Exception):
         """Global error handler for slash commands"""
-        self.logger.error(f"Command error in {interaction.command}: {error}")
+        self.logger.error(f"❌ Command error in {interaction.command}: {error}")
         
         # Try to respond to the user
         try:
             if not interaction.response.is_done():
                 await interaction.response.send_message(
-                    "❌ An error occurred while processing your command. Please try again.", 
+                    "⚠️ An error occurred while processing your command. Please try again.", 
                     ephemeral=True
                 )
             else:
                 await interaction.followup.send(
-                    "❌ An error occurred while processing your command. Please try again.", 
+                    "⚠️ An error occurred while processing your command. Please try again.", 
                     ephemeral=True
                 )
         except:
             # If we can't respond, just log it
-            self.logger.error(f"Could not send error message to user for command {interaction.command}")
+            self.logger.error(f"❌ Could not send error message to user for command {interaction.command}")
 
     async def on_guild_join(self, guild):
         """Called when the bot joins a new guild"""
-        self.logger.info(f"🎉 Joined new guild: {guild.name} (ID: {guild.id})")
+        self.logger.info(f"🎉 Joined new guild: {guild.name} (ID: {guild.id}) | Members: {guild.member_count}")
 
     async def on_guild_remove(self, guild):
         """Called when the bot leaves a guild"""
         self.logger.info(f"👋 Left guild: {guild.name} (ID: {guild.id})")
 
+    async def close(self):
+        """Clean shutdown"""
+        self.logger.info("🔄 Shutting down Herald bot...")
+        await super().close()
+
 
 def main():
-    """Main entry point"""
-    # Set up logging first
+    """Main entry point for production"""
+    # Set up logging
     setup_logging()
     
     # Create and run bot
     bot = HeraldBot()
     
     try:
-        bot.run(DISCORD_TOKEN)
+        asyncio.run(bot.start(DISCORD_TOKEN))
     except discord.LoginFailure:
-        logging.getLogger('Herald.Bot').error("❌ Invalid Discord token. Check your settings.")
+        logging.getLogger('Herald.Bot').error("❌ Invalid Discord token. Check your environment variables.")
+    except KeyboardInterrupt:
+        logging.getLogger('Herald.Bot').info("🛑 Bot shutdown requested by user")
     except Exception as e:
         logging.getLogger('Herald.Bot').error(f"❌ Bot startup failed: {e}")
 
