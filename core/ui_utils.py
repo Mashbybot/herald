@@ -75,17 +75,17 @@ class HeraldEmojis:
     # === DICE EMOJIS (Easy to customize) ===
     
     # Regular Dice (Gray/Dark theme)
-    REGULAR_BOTCH = "❗"        # 1 - botch/overreach 
-    REGULAR_FAILURE = "⚫"      # 2-5 - failure
-    REGULAR_SUCCESS = "🎯"      # 6-9 - success
-    REGULAR_CRITICAL = "⭐"     # 10 - potential critical
+    REGULAR_BOTCH = "<:Dice_reg_over:1413720433462612121>"        # 1 - botch/overreach 
+    REGULAR_FAILURE = "<:Dice_reg_fail:1413720432527413279>"      # 2-5 - failure
+    REGULAR_SUCCESS = "<:Dice_reg_succ:1413720435371282463>"      # 6-9 - success
+    REGULAR_CRITICAL = "<:Dice_reg_crit:1413720431130705950>"     # 10 - potential critical
     
     # Desperation Dice (Orange theme) 
     # NOTE: Replace these with your custom orange-tinted emojis when ready
-    DESPERATION_BOTCH = "🔶"    # 1 - desperation botch
-    DESPERATION_FAILURE = "🟠"  # 2-5 - desperation failure
-    DESPERATION_SUCCESS = "🔸"  # 6-9 - desperation success
-    DESPERATION_CRITICAL = "🟧" # 10 - desperation critical
+    DESPERATION_BOTCH = "<:Dice_des_over:1413720427183865887>"    # 1 - desperation botch
+    DESPERATION_FAILURE = "<:Dice_des_fail:1413720425678241862>"  # 2-5 - desperation failure
+    DESPERATION_SUCCESS = "<:Dice_des_succ:1413720429763498104>"  # 6-9 - desperation success
+    DESPERATION_CRITICAL = "<:Dice_des_crit:1413720424688390285>" # 10 - desperation critical
     
     # Edge Dice (grouped with regular for now)
     EDGE_BOTCH = "❗"           
