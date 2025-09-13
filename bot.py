@@ -3,7 +3,7 @@ import logging
 import asyncio
 from discord.ext import commands
 from config.settings import DISCORD_TOKEN, GUILD_ID, DEBUG_MODE
-from core.db import init_db
+from core.db import init_database
 
 # Configure logging for production
 def setup_logging():
@@ -62,7 +62,7 @@ class HeraldBot(commands.Bot):
         
         # Initialize database
         try:
-            init_db()
+            await init_database()
             self.logger.info("✅ Database initialized successfully")
         except Exception as e:
             self.logger.error(f"❌ Database initialization failed: {e}")
