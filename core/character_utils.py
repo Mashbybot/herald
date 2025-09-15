@@ -17,21 +17,6 @@ logger = logging.getLogger('Herald.Character.Utils')
 
 # ===== DATABASE UTILITIES =====
 
-@contextmanager
-def get_db_cursor():
-    """Context manager for database operations with proper transaction handling"""
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        yield cursor
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"Database transaction failed: {e}")
-        raise
-    finally:
-        conn.close()
-
 
 class DatabaseError(Exception):
     """Custom exception for database-related errors"""
@@ -119,21 +104,20 @@ async def find_character(user_id: str, character_name: str) -> Optional[Dict[str
         return cached_char
     
     try:
-        with get_db_cursor() as cur:
-            # First try exact match
-            cur.execute("SELECT * FROM characters WHERE user_id = ? AND name = ?", (user_id, character_name))
-            character = cur.fetchone()
-            
-            # If no exact match, try case-insensitive fuzzy matching
+        from core.db import get_db_connection
+        async with get_db_connection() as conn:
+            # First try exact match - PostgreSQL syntax
+            character = await conn.fetchrow(
+                "SELECT * FROM characters WHERE user_id = $1 AND name = $2", 
+                user_id, character_name
+            )
+                                    
+            # If no exact match, try case-insensitive
             if not character:
-                cur.execute("SELECT * FROM characters WHERE user_id = ?", (user_id,))
-                all_chars = cur.fetchall()
-                
-                # Find best match (case-insensitive)
-                for char in all_chars:
-                    if char['name'].lower() == character_name.lower():
-                        character = char
-                        break
+                character = await conn.fetchrow(
+                    "SELECT * FROM characters WHERE user_id = $1 AND LOWER(name) = LOWER($2)",
+                    user_id, character_name
+                )
             
             # Convert to dict and cache
             if character:
@@ -154,28 +138,29 @@ async def get_character_and_skills(user_id: str, character_name: str) -> Tuple[O
     """
     cache_key = f"char_skills:{user_id}:{character_name.lower()}"
     cached_data = _character_cache.get(cache_key)
-    
+            
     if cached_data is not None:
         return cached_data
-    
+            
     try:
-        with get_db_cursor() as cur:
-            # Get character
-            character = await find_character(user_id, character_name)
-            
-            skills = []
-            if character:
-                # Get skills using the actual character name from database
-                cur.execute(
-                    "SELECT skill_name, dots FROM skills WHERE user_id = ? AND character_name = ? ORDER BY dots DESC, skill_name",
-                    (user_id, character['name'])
+        # Get character first
+        character = await find_character(user_id, character_name)
+                
+        skills = []
+        if character:
+            from core.db import get_db_connection
+            async with get_db_connection() as conn:
+                # Get skills using PostgreSQL syntax
+                skill_rows = await conn.fetch(
+                    "SELECT skill_name, dots FROM skills WHERE user_id = $1 AND character_name = $2 ORDER BY dots DESC, skill_name",
+                    user_id, character['name']
                 )
-                skills = [dict(row) for row in cur.fetchall()]
-            
-            result = (character, skills)
-            _character_cache.set(cache_key, result)
-            return result
-            
+                skills = [dict(row) for row in skill_rows]
+                
+        result = (character, skills)
+        _character_cache.set(cache_key, result)
+        return result
+                
     except Exception as e:
         logger.error(f"Error getting character and skills for '{character_name}' (user {user_id}): {e}")
         raise DatabaseError(f"Failed to get character and skills: {e}")
@@ -245,27 +230,31 @@ async def character_autocomplete(interaction: discord.Interaction, current: str)
     """Character name autocomplete with caching and error handling."""
     user_id = str(interaction.user.id)
     cache_key = f"autocomplete:{user_id}"
-    
+            
     try:
         characters = _character_cache.get(cache_key)
-        
+                
         if characters is None:
-            with get_db_cursor() as cur:
-                cur.execute("SELECT name FROM characters WHERE user_id = ? ORDER BY name", (user_id,))
-                characters = [row['name'] for row in cur.fetchall()]
+            from core.db import get_db_connection
+            async with get_db_connection() as conn:
+                rows = await conn.fetch(
+                    "SELECT name FROM characters WHERE user_id = $1 ORDER BY name", 
+                    user_id
+                )
+                characters = [row['name'] for row in rows]
                 _character_cache.set(cache_key, characters)
-        
+                
         # Filter based on current input
         filtered = [
             char_name for char_name in characters 
             if current.lower() in char_name.lower()
         ]
-        
+                
         return [
             app_commands.Choice(name=char_name, value=char_name)
             for char_name in filtered[:25]  # Discord limit
         ]
-        
+                
     except Exception as e:
         logger.error(f"Error in character autocomplete for user {user_id}: {e}")
         return []
@@ -307,14 +296,20 @@ async def character_not_found_message(user_id: str, character_name: str) -> str:
     return base_msg + suggestion
 
 
-def ensure_h5e_columns():
+async def ensure_h5e_columns():
     """Ensure H5E columns exist with enhanced error handling."""
     try:
-        with get_db_cursor() as cur:
-            # Check existing columns
-            cur.execute("PRAGMA table_info(characters)")
-            columns = [row[1] for row in cur.fetchall()]
-            
+        from core.db import get_db_connection
+        async with get_db_connection() as conn:
+            # Check existing columns in PostgreSQL
+            result = await conn.fetch("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'characters'
+            """)
+                    
+            columns = [row['column_name'] for row in result]
+                    
             # H5E mechanics columns
             h5e_columns = {
                 'ambition': 'TEXT DEFAULT NULL',
@@ -322,13 +317,13 @@ def ensure_h5e_columns():
                 'drive': 'TEXT DEFAULT NULL',
                 'redemption': 'TEXT DEFAULT NULL'
             }
-            
+                    
             # Add missing columns
             for column, definition in h5e_columns.items():
                 if column not in columns:
                     logger.info(f"Adding {column} column to characters table")
-                    cur.execute(f"ALTER TABLE characters ADD COLUMN {column} {definition}")
-            
+                    await conn.execute(f"ALTER TABLE characters ADD COLUMN {column} {definition}")
+                    
     except Exception as e:
         logger.error(f"Error ensuring H5E columns: {e}")
         raise DatabaseError(f"Failed to ensure H5E columns: {e}")

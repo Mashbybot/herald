@@ -198,7 +198,7 @@ class CharacterManagement(commands.Cog):
             cur = conn.cursor()
 
             # Ensure H5E columns exist
-            ensure_h5e_columns()
+            await ensure_h5e_columns()
 
             # Check for existing character
             cur.execute("SELECT name FROM characters WHERE user_id = ? AND name = ?", (user_id, name))
