@@ -1,4 +1,4 @@
-# core/db.py - Fixed for PostgreSQL with proper sync wrapper
+# core/db.py - Fixed for PostgreSQL with proper sync wrapper - Version 2
 
 import os
 import asyncio
@@ -193,30 +193,55 @@ class PostgreSQLSyncWrapper:
     
     def __init__(self):
         self._connection = None
-        self._in_transaction = False
+        self._should_release = False
     
     def __enter__(self):
-        # Get a connection from the pool synchronously
-        loop = asyncio.get_event_loop()
-        self._connection = loop.run_until_complete(self._get_connection())
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self._connection:
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(self._release_connection())
+        self.close()
     
-    async def _get_connection(self):
-        return await _pool.acquire()
-    
-    async def _release_connection(self):
-        if self._connection:
-            await _pool.release(self._connection)
-            self._connection = None
+    def _get_connection_sync(self):
+        """Get connection synchronously"""
+        if self._connection is None:
+            if _pool is None:
+                raise RuntimeError("Database pool not initialized. Make sure init_database() was called.")
+            
+            # Get the current event loop
+            try:
+                loop = asyncio.get_running_loop()
+                # We're in an async context, but we need sync behavior
+                # Create a new event loop in a thread
+                import concurrent.futures
+                import threading
+                
+                def run_async():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(_pool.acquire())
+                    finally:
+                        new_loop.close()
+                
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_async)
+                    self._connection = future.result()
+                    
+            except RuntimeError:
+                # No event loop running, we can use asyncio.run
+                async def acquire():
+                    return await _pool.acquire()
+                
+                self._connection = asyncio.run(acquire())
+            
+            self._should_release = True
+        
+        return self._connection
     
     def cursor(self):
         """Return a cursor-like object for PostgreSQL"""
-        return PostgreSQLCursorWrapper(self._connection)
+        conn = self._get_connection_sync()
+        return PostgreSQLCursorWrapper(conn)
     
     def commit(self):
         """Commit transaction (no-op for PostgreSQL autocommit)"""
@@ -224,14 +249,25 @@ class PostgreSQLSyncWrapper:
     
     def rollback(self):
         """Rollback transaction"""
-        if self._connection:
-            loop = asyncio.get_event_loop()
-            # PostgreSQL connections auto-rollback on error
-            pass
+        pass
     
     def close(self):
-        """Close connection (handled by context manager)"""
-        pass
+        """Close connection"""
+        if self._connection and self._should_release:
+            if _pool:
+                # Release connection back to pool
+                try:
+                    loop = asyncio.get_running_loop()
+                    # Create task to release later
+                    loop.create_task(_pool.release(self._connection))
+                except RuntimeError:
+                    # No loop running, use asyncio.run
+                    async def release():
+                        await _pool.release(self._connection)
+                    asyncio.run(release())
+            
+            self._connection = None
+            self._should_release = False
 
 class PostgreSQLCursorWrapper:
     """
@@ -245,25 +281,69 @@ class PostgreSQLCursorWrapper:
     
     def execute(self, query, params=None):
         """Execute query synchronously"""
-        loop = asyncio.get_event_loop()
+        try:
+            # Convert SQLite ? placeholders to PostgreSQL $1, $2, etc.
+            pg_query = self._convert_query(query)
+            query_lower = query.lower().strip()
+            
+            # Run the query synchronously
+            if query_lower.startswith(('insert', 'update', 'delete')):
+                # For modification queries, use execute
+                result = self._run_sync_query(self.connection.execute, pg_query, params)
+                self._last_result = []
+                # Parse the result to get rowcount
+                if isinstance(result, str) and result.startswith(('INSERT', 'UPDATE', 'DELETE')):
+                    # PostgreSQL returns strings like "INSERT 0 1" or "UPDATE 3"
+                    parts = result.split()
+                    if len(parts) >= 2:
+                        try:
+                            self.rowcount = int(parts[-1])
+                        except ValueError:
+                            self.rowcount = 1 if result else 0
+                    else:
+                        self.rowcount = 1 if result else 0
+                else:
+                    self.rowcount = 1 if result else 0
+            else:
+                # For select queries, use fetch
+                self._last_result = self._run_sync_query(self.connection.fetch, pg_query, params)
+                self.rowcount = len(self._last_result) if self._last_result else 0
+                    
+        except Exception as e:
+            logger.error(f"Database query failed: {e}")
+            logger.error(f"Original query: {query}")
+            logger.error(f"Converted query: {pg_query}")
+            logger.error(f"Params: {params}")
+            raise
+    
+    def _run_sync_query(self, coro_func, query, params):
+        """Run an async query synchronously"""
+        async def run_query():
+            if params:
+                return await coro_func(query, *params)
+            else:
+                return await coro_func(query)
         
-        # Convert SQLite ? placeholders to PostgreSQL $1, $2, etc.
-        pg_query = self._convert_query(query)
-        
-        if params:
-            self._last_result = loop.run_until_complete(
-                self.connection.fetch(pg_query, *params)
-            )
-        else:
-            self._last_result = loop.run_until_complete(
-                self.connection.fetch(pg_query)
-            )
-        
-        # Set rowcount for compatibility
-        if self._last_result:
-            self.rowcount = len(self._last_result)
-        else:
-            self.rowcount = 0
+        try:
+            loop = asyncio.get_running_loop()
+            # We're in an async context, use a thread
+            import concurrent.futures
+            
+            def run_in_new_loop():
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                try:
+                    return new_loop.run_until_complete(run_query())
+                finally:
+                    new_loop.close()
+            
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(run_in_new_loop)
+                return future.result()
+                
+        except RuntimeError:
+            # No event loop running
+            return asyncio.run(run_query())
     
     def fetchone(self):
         """Fetch one row"""
@@ -282,6 +362,9 @@ class PostgreSQLCursorWrapper:
     
     def _convert_query(self, query):
         """Convert SQLite ? placeholders to PostgreSQL $1, $2, etc."""
+        if '?' not in query:
+            return query
+            
         parts = query.split('?')
         if len(parts) == 1:
             return query
@@ -354,8 +437,59 @@ def init_sqlite_db():
         );
     """)
     
-    # Create other tables...
-    # (Add remaining table creation code as needed)
+    # Create equipment table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS equipment (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            character_name TEXT NOT NULL,
+            item_name TEXT NOT NULL,
+            description TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id, character_name) REFERENCES characters(user_id, name) ON DELETE CASCADE
+        );
+    """)
+    
+    # Create notes table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            character_name TEXT NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id, character_name) REFERENCES characters(user_id, name) ON DELETE CASCADE
+        );
+    """)
+    
+    # Create specialties table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS specialties (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            character_name TEXT NOT NULL,
+            skill_name TEXT NOT NULL,
+            specialty_name TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, character_name, skill_name, specialty_name),
+            FOREIGN KEY (user_id, character_name) REFERENCES characters(user_id, name) ON DELETE CASCADE
+        );
+    """)
+    
+    # Create XP log table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS xp_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            character_name TEXT NOT NULL,
+            action TEXT NOT NULL,
+            amount INTEGER NOT NULL,
+            reason TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id, character_name) REFERENCES characters(user_id, name) ON DELETE CASCADE
+        );
+    """)
     
     conn.commit()
     conn.close()
@@ -389,9 +523,6 @@ async def migrate_sqlite_to_postgresql(sqlite_path: str, postgresql_url: str):
                 """, *[char[key] for key in char.keys() if key not in ['id', 'created_at', 'updated_at']])
         
         logger.info(f"✅ Migrated {len(characters)} characters")
-        
-        # Migrate skills, equipment, notes, etc. (similar pattern)
-        # ... additional migration code ...
         
     finally:
         sqlite_conn.close()
