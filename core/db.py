@@ -1,4 +1,4 @@
-# core/db.py - Fixed for PostgreSQL with proper sync wrapper - Version 2
+# core/db.py - Simplified for async PostgreSQL and sync SQLite
 
 import os
 import asyncio
@@ -38,7 +38,7 @@ async def init_database():
 
 async def run_postgresql_migrations():
     """Run database migrations for PostgreSQL"""
-    async with get_async_connection() as conn:
+    async with get_async_db() as conn:
         # Create tables matching SQLite schema
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS schema_info (
@@ -162,218 +162,24 @@ async def run_postgresql_migrations():
         await conn.execute("INSERT INTO schema_info (version, updated_at) VALUES (3, NOW()) ON CONFLICT (version) DO UPDATE SET updated_at = NOW();")
 
 @asynccontextmanager
-async def get_async_connection():
-    """Get async database connection (PostgreSQL or SQLite)"""
-    if USE_POSTGRESQL:
-        # PostgreSQL connection from pool
-        async with _pool.acquire() as conn:
-            yield conn
-    else:
-        # For SQLite, we'd need aiosqlite, but for now just raise an error
-        raise RuntimeError("Async SQLite connections not implemented. Use get_db_connection() for sync SQLite.")
+async def get_async_db():
+    """Get async database connection for PostgreSQL"""
+    if not USE_POSTGRESQL:
+        raise RuntimeError("Async connection only available for PostgreSQL. Use get_db_connection() for SQLite.")
+    
+    if _pool is None:
+        raise RuntimeError("Database pool not initialized. Make sure init_database() was called.")
+    
+    async with _pool.acquire() as conn:
+        yield conn
 
 def get_db_connection():
-    """
-    Get synchronous database connection.
-    This is the main function that should be used by all cogs.
-    Returns a connection that works like SQLite for compatibility.
-    """
+    """Get synchronous database connection - FOR SQLITE ONLY"""
     if USE_POSTGRESQL:
-        # For PostgreSQL in production, we need to wrap async calls
-        return PostgreSQLSyncWrapper()
+        raise RuntimeError("PostgreSQL requires async operations. Use 'async with get_async_db() as conn' instead.")
     else:
         # SQLite for development
         return get_sqlite_connection()
-
-class PostgreSQLSyncWrapper:
-    """
-    Wrapper to make PostgreSQL work with sync code patterns.
-    This allows existing SQLite-style code to work with PostgreSQL.
-    """
-    
-    def __init__(self):
-        self._connection = None
-        self._should_release = False
-    
-    def __enter__(self):
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
-    
-    def _get_connection_sync(self):
-        """Get connection synchronously"""
-        if self._connection is None:
-            if _pool is None:
-                raise RuntimeError("Database pool not initialized. Make sure init_database() was called.")
-            
-            # Get the current event loop
-            try:
-                loop = asyncio.get_running_loop()
-                # We're in an async context, but we need sync behavior
-                # Create a new event loop in a thread
-                import concurrent.futures
-                import threading
-                
-                def run_async():
-                    new_loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(new_loop)
-                    try:
-                        return new_loop.run_until_complete(_pool.acquire())
-                    finally:
-                        new_loop.close()
-                
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(run_async)
-                    self._connection = future.result()
-                    
-            except RuntimeError:
-                # No event loop running, we can use asyncio.run
-                async def acquire():
-                    return await _pool.acquire()
-                
-                self._connection = asyncio.run(acquire())
-            
-            self._should_release = True
-        
-        return self._connection
-    
-    def cursor(self):
-        """Return a cursor-like object for PostgreSQL"""
-        conn = self._get_connection_sync()
-        return PostgreSQLCursorWrapper(conn)
-    
-    def commit(self):
-        """Commit transaction (no-op for PostgreSQL autocommit)"""
-        pass
-    
-    def rollback(self):
-        """Rollback transaction"""
-        pass
-    
-    def close(self):
-        """Close connection"""
-        if self._connection and self._should_release:
-            if _pool:
-                # Release connection back to pool
-                try:
-                    loop = asyncio.get_running_loop()
-                    # Create task to release later
-                    loop.create_task(_pool.release(self._connection))
-                except RuntimeError:
-                    # No loop running, use asyncio.run
-                    async def release():
-                        await _pool.release(self._connection)
-                    asyncio.run(release())
-            
-            self._connection = None
-            self._should_release = False
-
-class PostgreSQLCursorWrapper:
-    """
-    Cursor wrapper to make PostgreSQL work with SQLite-style cursor code.
-    """
-    
-    def __init__(self, connection):
-        self.connection = connection
-        self.rowcount = 0
-        self._last_result = None
-    
-    def execute(self, query, params=None):
-        """Execute query synchronously"""
-        try:
-            # Convert SQLite ? placeholders to PostgreSQL $1, $2, etc.
-            pg_query = self._convert_query(query)
-            query_lower = query.lower().strip()
-            
-            # Run the query synchronously
-            if query_lower.startswith(('insert', 'update', 'delete')):
-                # For modification queries, use execute
-                result = self._run_sync_query(self.connection.execute, pg_query, params)
-                self._last_result = []
-                # Parse the result to get rowcount
-                if isinstance(result, str) and result.startswith(('INSERT', 'UPDATE', 'DELETE')):
-                    # PostgreSQL returns strings like "INSERT 0 1" or "UPDATE 3"
-                    parts = result.split()
-                    if len(parts) >= 2:
-                        try:
-                            self.rowcount = int(parts[-1])
-                        except ValueError:
-                            self.rowcount = 1 if result else 0
-                    else:
-                        self.rowcount = 1 if result else 0
-                else:
-                    self.rowcount = 1 if result else 0
-            else:
-                # For select queries, use fetch
-                self._last_result = self._run_sync_query(self.connection.fetch, pg_query, params)
-                self.rowcount = len(self._last_result) if self._last_result else 0
-                    
-        except Exception as e:
-            logger.error(f"Database query failed: {e}")
-            logger.error(f"Original query: {query}")
-            logger.error(f"Converted query: {pg_query}")
-            logger.error(f"Params: {params}")
-            raise
-    
-    def _run_sync_query(self, coro_func, query, params):
-        """Run an async query synchronously"""
-        async def run_query():
-            if params:
-                return await coro_func(query, *params)
-            else:
-                return await coro_func(query)
-        
-        try:
-            loop = asyncio.get_running_loop()
-            # We're in an async context, use a thread
-            import concurrent.futures
-            
-            def run_in_new_loop():
-                new_loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(new_loop)
-                try:
-                    return new_loop.run_until_complete(run_query())
-                finally:
-                    new_loop.close()
-            
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(run_in_new_loop)
-                return future.result()
-                
-        except RuntimeError:
-            # No event loop running
-            return asyncio.run(run_query())
-    
-    def fetchone(self):
-        """Fetch one row"""
-        if self._last_result and len(self._last_result) > 0:
-            row = self._last_result[0]
-            # Convert asyncpg Record to dict for SQLite compatibility
-            return dict(row)
-        return None
-    
-    def fetchall(self):
-        """Fetch all rows"""
-        if self._last_result:
-            # Convert asyncpg Records to dicts
-            return [dict(row) for row in self._last_result]
-        return []
-    
-    def _convert_query(self, query):
-        """Convert SQLite ? placeholders to PostgreSQL $1, $2, etc."""
-        if '?' not in query:
-            return query
-            
-        parts = query.split('?')
-        if len(parts) == 1:
-            return query
-        
-        result = parts[0]
-        for i in range(1, len(parts)):
-            result += f"${i}" + parts[i]
-        
-        return result
 
 def get_sqlite_connection():
     """Get SQLite connection (for development)"""
@@ -383,7 +189,7 @@ def get_sqlite_connection():
     return conn
 
 def init_sqlite_db():
-    """Initialize SQLite database (existing function for development)"""
+    """Initialize SQLite database (for development)"""
     conn = get_sqlite_connection()
     cursor = conn.cursor()
     
@@ -494,38 +300,3 @@ def init_sqlite_db():
     conn.commit()
     conn.close()
     logger.info("📁 SQLite database initialized")
-
-async def migrate_sqlite_to_postgresql(sqlite_path: str, postgresql_url: str):
-    """Migration script to move data from SQLite to PostgreSQL"""
-    logger.info("🔄 Starting SQLite to PostgreSQL migration...")
-    
-    # Connect to both databases
-    sqlite_conn = sqlite3.connect(sqlite_path)
-    sqlite_conn.row_factory = sqlite3.Row
-    
-    pool = await asyncpg.create_pool(postgresql_url)
-    
-    try:
-        # Migrate characters
-        sqlite_cursor = sqlite_conn.cursor()
-        sqlite_cursor.execute("SELECT * FROM characters")
-        characters = sqlite_cursor.fetchall()
-        
-        async with pool.acquire() as pg_conn:
-            for char in characters:
-                await pg_conn.execute("""
-                    INSERT INTO characters (user_id, name, strength, dexterity, stamina, 
-                    charisma, manipulation, composure, intelligence, wits, resolve,
-                    health, willpower, health_sup, health_agg, willpower_sup, willpower_agg,
-                    desperation, edge, creed, ambition, desire, drive, redemption, danger)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
-                    ON CONFLICT (user_id, name) DO NOTHING
-                """, *[char[key] for key in char.keys() if key not in ['id', 'created_at', 'updated_at']])
-        
-        logger.info(f"✅ Migrated {len(characters)} characters")
-        
-    finally:
-        sqlite_conn.close()
-        await pool.close()
-    
-    logger.info("🎉 Migration completed successfully!")

@@ -7,16 +7,12 @@ import discord
 import logging
 from typing import Optional, List, Tuple, Dict, Any
 from discord import app_commands
-from contextlib import contextmanager
 import time
-
-from core.db import get_db_connection
 
 logger = logging.getLogger('Herald.Character.Utils')
 
 
 # ===== DATABASE UTILITIES =====
-
 
 class DatabaseError(Exception):
     """Custom exception for database-related errors"""
@@ -104,14 +100,14 @@ async def find_character(user_id: str, character_name: str) -> Optional[Dict[str
         return cached_char
     
     try:
-        from core.db import get_db_connection
-        async with get_db_connection() as conn:
+        from core.db import get_async_db
+        async with get_async_db() as conn:
             # First try exact match - PostgreSQL syntax
             character = await conn.fetchrow(
                 "SELECT * FROM characters WHERE user_id = $1 AND name = $2", 
                 user_id, character_name
             )
-                                    
+            
             # If no exact match, try case-insensitive
             if not character:
                 character = await conn.fetchrow(
@@ -138,29 +134,29 @@ async def get_character_and_skills(user_id: str, character_name: str) -> Tuple[O
     """
     cache_key = f"char_skills:{user_id}:{character_name.lower()}"
     cached_data = _character_cache.get(cache_key)
-            
+    
     if cached_data is not None:
         return cached_data
-            
+    
     try:
         # Get character first
         character = await find_character(user_id, character_name)
-                
+        
         skills = []
         if character:
-            from core.db import get_db_connection
-            async with get_db_connection() as conn:
+            from core.db import get_async_db
+            async with get_async_db() as conn:
                 # Get skills using PostgreSQL syntax
                 skill_rows = await conn.fetch(
                     "SELECT skill_name, dots FROM skills WHERE user_id = $1 AND character_name = $2 ORDER BY dots DESC, skill_name",
                     user_id, character['name']
                 )
                 skills = [dict(row) for row in skill_rows]
-                
+        
         result = (character, skills)
         _character_cache.set(cache_key, result)
         return result
-                
+        
     except Exception as e:
         logger.error(f"Error getting character and skills for '{character_name}' (user {user_id}): {e}")
         raise DatabaseError(f"Failed to get character and skills: {e}")
@@ -179,10 +175,12 @@ async def get_character_attribute(user_id: str, character_name: str, attribute: 
         return cached_value
     
     try:
-        with get_db_cursor() as cur:
-            cur.execute(f"SELECT {attribute.lower()} FROM characters WHERE user_id = ? AND name = ?", 
-                       (user_id, character_name))
-            result = cur.fetchone()
+        from core.db import get_async_db
+        async with get_async_db() as conn:
+            result = await conn.fetchrow(
+                f"SELECT {attribute.lower()} FROM characters WHERE user_id = $1 AND name = $2", 
+                user_id, character_name
+            )
             
             if result:
                 value = result[attribute.lower()]
@@ -209,10 +207,12 @@ async def get_character_skill(user_id: str, character_name: str, skill_name: str
         return cached_value
     
     try:
-        with get_db_cursor() as cur:
-            cur.execute("SELECT dots FROM skills WHERE user_id = ? AND character_name = ? AND skill_name = ?", 
-                       (user_id, character_name, skill_name))
-            result = cur.fetchone()
+        from core.db import get_async_db
+        async with get_async_db() as conn:
+            result = await conn.fetchrow(
+                "SELECT dots FROM skills WHERE user_id = $1 AND character_name = $2 AND skill_name = $3", 
+                user_id, character_name, skill_name
+            )
             
             if result:
                 value = result['dots']
@@ -230,31 +230,31 @@ async def character_autocomplete(interaction: discord.Interaction, current: str)
     """Character name autocomplete with caching and error handling."""
     user_id = str(interaction.user.id)
     cache_key = f"autocomplete:{user_id}"
-            
+    
     try:
         characters = _character_cache.get(cache_key)
-                
+        
         if characters is None:
-            from core.db import get_db_connection
-            async with get_db_connection() as conn:
+            from core.db import get_async_db
+            async with get_async_db() as conn:
                 rows = await conn.fetch(
                     "SELECT name FROM characters WHERE user_id = $1 ORDER BY name", 
                     user_id
                 )
                 characters = [row['name'] for row in rows]
                 _character_cache.set(cache_key, characters)
-                
+        
         # Filter based on current input
         filtered = [
             char_name for char_name in characters 
             if current.lower() in char_name.lower()
         ]
-                
+        
         return [
             app_commands.Choice(name=char_name, value=char_name)
             for char_name in filtered[:25]  # Discord limit
         ]
-                
+        
     except Exception as e:
         logger.error(f"Error in character autocomplete for user {user_id}: {e}")
         return []
@@ -265,16 +265,20 @@ async def character_autocomplete(interaction: discord.Interaction, current: str)
 async def character_not_found_message(user_id: str, character_name: str) -> str:
     """Enhanced character not found message with suggestions and caching"""
     # Import here to avoid circular dependency
-    from ui_utils import HeraldEmojis
+    from core.ui_utils import HeraldEmojis
     
     cache_key = f"user_chars:{user_id}"
     user_characters = _character_cache.get(cache_key)
     
     if user_characters is None:
         try:
-            with get_db_cursor() as cur:
-                cur.execute("SELECT name FROM characters WHERE user_id = ? ORDER BY name", (user_id,))
-                user_characters = [row['name'] for row in cur.fetchall()]
+            from core.db import get_async_db
+            async with get_async_db() as conn:
+                rows = await conn.fetch(
+                    "SELECT name FROM characters WHERE user_id = $1 ORDER BY name", 
+                    user_id
+                )
+                user_characters = [row['name'] for row in rows]
                 _character_cache.set(cache_key, user_characters)
         except Exception as e:
             logger.error(f"Error getting user characters: {e}")
@@ -299,17 +303,17 @@ async def character_not_found_message(user_id: str, character_name: str) -> str:
 async def ensure_h5e_columns():
     """Ensure H5E columns exist with enhanced error handling."""
     try:
-        from core.db import get_db_connection
-        async with get_db_connection() as conn:
+        from core.db import get_async_db
+        async with get_async_db() as conn:
             # Check existing columns in PostgreSQL
             result = await conn.fetch("""
                 SELECT column_name 
                 FROM information_schema.columns 
                 WHERE table_name = 'characters'
             """)
-                    
+            
             columns = [row['column_name'] for row in result]
-                    
+            
             # H5E mechanics columns
             h5e_columns = {
                 'ambition': 'TEXT DEFAULT NULL',
@@ -317,13 +321,13 @@ async def ensure_h5e_columns():
                 'drive': 'TEXT DEFAULT NULL',
                 'redemption': 'TEXT DEFAULT NULL'
             }
-                    
+            
             # Add missing columns
             for column, definition in h5e_columns.items():
                 if column not in columns:
                     logger.info(f"Adding {column} column to characters table")
                     await conn.execute(f"ALTER TABLE characters ADD COLUMN {column} {definition}")
-                    
+            
     except Exception as e:
         logger.error(f"Error ensuring H5E columns: {e}")
         raise DatabaseError(f"Failed to ensure H5E columns: {e}")
@@ -347,7 +351,7 @@ def invalidate_character_cache(user_id: str, character_name: str = None):
 def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict[str, Any]]) -> discord.Embed:
     """Create an enhanced character sheet with full validation and error handling."""
     # Import here to avoid circular dependency
-    from ui_utils import HeraldEmojis, create_health_bar, create_willpower_bar, create_edge_bar, create_desperation_bar, create_skill_display
+    from core.ui_utils import HeraldEmojis, create_health_bar, create_willpower_bar, create_edge_bar, create_desperation_bar, create_skill_display
     
     try:
         name = character.get('name', 'Unknown')
@@ -508,32 +512,6 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         )
 
 
-# ===== LEGACY COMPATIBILITY =====
-
-# Legacy functions for backward compatibility (with deprecation warnings)
-def damage_bar(current_max: int, superficial: int, aggravated: int, absolute_max: int = 8) -> str:
-    """DEPRECATED: Use create_health_bar from ui_utils instead"""
-    logger.warning("damage_bar() is deprecated, use create_health_bar() from ui_utils instead")
-    from ui_utils import create_health_bar
-    return create_health_bar(current_max, superficial, aggravated, absolute_max)
-
-
-def willpower_bar(current_max: int, superficial: int, aggravated: int, absolute_max: int = 10) -> str:
-    """DEPRECATED: Use create_willpower_bar from ui_utils instead"""
-    logger.warning("willpower_bar() is deprecated, use create_willpower_bar() from ui_utils instead")
-    from ui_utils import create_willpower_bar
-    return create_willpower_bar(current_max, superficial, aggravated, absolute_max)
-
-
-def create_desperation_bar_legacy(desperation: int) -> str:
-    """DEPRECATED: Use create_desperation_bar from ui_utils instead"""
-    logger.warning("create_desperation_bar_legacy() is deprecated, use create_desperation_bar() from ui_utils instead")
-    from ui_utils import HeraldEmojis
-    filled = "🔴" * desperation
-    empty = "⚫" * (10 - desperation)
-    return f"`[{filled}{empty}]` {desperation}/10"
-
-
 # ===== BACKWARD COMPATIBILITY ALIASES =====
 
 # For existing code that expects HeraldMessages in character_utils
@@ -546,20 +524,20 @@ class HeraldMessages:
     
     @staticmethod 
     def xp_insufficient(needed: int, available: int, improvement: str) -> str:
-        from ui_utils import HeraldMessages as UIMessages
+        from core.ui_utils import HeraldMessages as UIMessages
         return UIMessages.xp_insufficient(needed, available, improvement)
     
     @staticmethod
     def skill_at_maximum(skill_name: str, current_dots: int) -> str:
-        from ui_utils import HeraldMessages as UIMessages
+        from core.ui_utils import HeraldMessages as UIMessages
         return UIMessages.skill_at_maximum(skill_name, current_dots)
     
     @staticmethod
     def operation_success(title: str, description: str) -> str:
-        from ui_utils import HeraldMessages as UIMessages
+        from core.ui_utils import HeraldMessages as UIMessages
         return UIMessages.operation_success(title, description)
     
     @staticmethod
     def operation_failed(title: str, error: str, suggestion: str = None) -> str:
-        from ui_utils import HeraldMessages as UIMessages
+        from core.ui_utils import HeraldMessages as UIMessages
         return UIMessages.operation_failed(title, error, suggestion)
