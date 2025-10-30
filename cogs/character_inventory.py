@@ -1,6 +1,7 @@
 """
 Character Inventory Cog for Herald Bot
 Handles equipment and notes management for characters
+CONVERTED TO ASYNC POSTGRESQL
 """
 
 import discord
@@ -9,7 +10,7 @@ from discord.ext import commands
 from typing import List
 import logging
 
-from core.db import get_db_connection
+from core.db import get_async_db
 from core.character_utils import find_character, character_autocomplete
 from config.settings import GUILD_ID
 
@@ -35,15 +36,12 @@ class ClearEquipmentView(discord.ui.View):
     async def confirm_clear(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Confirm and execute equipment clearing"""
         try:
-            conn = get_db_connection()
-            cur = conn.cursor()
-            
-            cur.execute("DELETE FROM equipment WHERE user_id = ? AND character_name = ?", 
-                       (self.user_id, self.character_name))
-            
-            deleted_count = cur.rowcount
-            conn.commit()
-            conn.close()
+            async with get_async_db() as conn:
+                result = await conn.execute(
+                    "DELETE FROM equipment WHERE user_id = $1 AND character_name = $2",
+                    self.user_id, self.character_name
+                )
+                deleted_count = int(result.split()[-1]) if result else 0
             
             embed = discord.Embed(
                 title="✅ Equipment Cleared",
@@ -51,7 +49,6 @@ class ClearEquipmentView(discord.ui.View):
                 color=0x228B22
             )
             
-            # Disable all buttons
             for item in self.children:
                 item.disabled = True
             
@@ -73,7 +70,6 @@ class ClearEquipmentView(discord.ui.View):
             color=0x4169E1
         )
         
-        # Disable all buttons
         for item in self.children:
             item.disabled = True
         
@@ -102,15 +98,12 @@ class ClearNotesView(discord.ui.View):
     async def confirm_clear(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Confirm and execute notes clearing"""
         try:
-            conn = get_db_connection()
-            cur = conn.cursor()
-            
-            cur.execute("DELETE FROM notes WHERE user_id = ? AND character_name = ?", 
-                       (self.user_id, self.character_name))
-            
-            deleted_count = cur.rowcount
-            conn.commit()
-            conn.close()
+            async with get_async_db() as conn:
+                result = await conn.execute(
+                    "DELETE FROM notes WHERE user_id = $1 AND character_name = $2",
+                    self.user_id, self.character_name
+                )
+                deleted_count = int(result.split()[-1]) if result else 0
             
             embed = discord.Embed(
                 title="✅ Notes Cleared",
@@ -118,7 +111,6 @@ class ClearNotesView(discord.ui.View):
                 color=0x228B22
             )
             
-            # Disable all buttons
             for item in self.children:
                 item.disabled = True
             
@@ -140,7 +132,6 @@ class ClearNotesView(discord.ui.View):
             color=0x4169E1
         )
         
-        # Disable all buttons
         for item in self.children:
             item.disabled = True
         
@@ -188,39 +179,18 @@ class CharacterInventory(commands.Cog):
         user_id = str(interaction.user.id)
         
         try:
-            # Use fuzzy character matching
             char = await find_character(user_id, character)
             
             if not char:
                 await interaction.response.send_message(f"⚠️ No character named **{character}** found", ephemeral=True)
                 return
             
-            conn = get_db_connection()
-            cur = conn.cursor()
-            
-            # Create equipment table if it doesn't exist
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS equipment (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT NOT NULL,
-                    character_name TEXT NOT NULL,
-                    item_name TEXT NOT NULL,
-                    description TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id, character_name) REFERENCES characters(user_id, name) ON DELETE CASCADE
-                )
-            """)
-            
             if action == "view":
-                # Show all equipment
-                cur.execute("""
-                    SELECT item_name, description 
-                    FROM equipment 
-                    WHERE user_id = ? AND character_name = ? 
-                    ORDER BY item_name
-                """, (user_id, char['name']))
-                
-                equipment_list = cur.fetchall()
+                async with get_async_db() as conn:
+                    equipment_list = await conn.fetch(
+                        "SELECT item_name, description FROM equipment WHERE user_id = $1 AND character_name = $2 ORDER BY item_name",
+                        user_id, char['name']
+                    )
                 
                 embed = discord.Embed(
                     title=f"🎒 {char['name']}'s Equipment",
@@ -242,12 +212,10 @@ class CharacterInventory(commands.Cog):
                         else:
                             equipment_text.append(f"**{eq['item_name']}**")
                     
-                    # Split into chunks if too long
                     full_text = "\n".join(equipment_text)
                     if len(full_text) <= 1024:
                         embed.add_field(name="📦 Items", value=full_text, inline=False)
                     else:
-                        # Split into multiple fields
                         chunks = []
                         current_chunk = []
                         current_length = 0
@@ -281,20 +249,20 @@ class CharacterInventory(commands.Cog):
                     await interaction.response.send_message("❌ Item name too long (max 100 characters)", ephemeral=True)
                     return
                 
-                # Check if item already exists
-                cur.execute("SELECT id FROM equipment WHERE user_id = ? AND character_name = ? AND item_name = ?",
-                           (user_id, char['name'], item))
-                if cur.fetchone():
-                    await interaction.response.send_message(f"⚠️ **{item}** already in equipment list", ephemeral=True)
-                    return
-                
-                # Add equipment
-                cur.execute("""
-                    INSERT INTO equipment (user_id, character_name, item_name, description)
-                    VALUES (?, ?, ?, ?)
-                """, (user_id, char['name'], item, description))
-                
-                conn.commit()
+                async with get_async_db() as conn:
+                    existing = await conn.fetchrow(
+                        "SELECT id FROM equipment WHERE user_id = $1 AND character_name = $2 AND item_name = $3",
+                        user_id, char['name'], item
+                    )
+                    
+                    if existing:
+                        await interaction.response.send_message(f"⚠️ **{item}** already in equipment list", ephemeral=True)
+                        return
+                    
+                    await conn.execute(
+                        "INSERT INTO equipment (user_id, character_name, item_name, description) VALUES ($1, $2, $3, $4)",
+                        user_id, char['name'], item, description
+                    )
                 
                 embed = discord.Embed(
                     title="✅ Equipment Added",
@@ -313,26 +281,26 @@ class CharacterInventory(commands.Cog):
                     await interaction.response.send_message("❌ Item name required for removing equipment", ephemeral=True)
                     return
                 
-                # Remove equipment (fuzzy matching)
-                cur.execute("SELECT item_name FROM equipment WHERE user_id = ? AND character_name = ?", 
-                           (user_id, char['name']))
-                all_items = cur.fetchall()
-                
-                # Find best match
-                target_item = None
-                for eq_item in all_items:
-                    if eq_item['item_name'].lower() == item.lower():
-                        target_item = eq_item['item_name']
-                        break
-                
-                if not target_item:
-                    await interaction.response.send_message(f"⚠️ Equipment item **{item}** not found", ephemeral=True)
-                    return
-                
-                cur.execute("DELETE FROM equipment WHERE user_id = ? AND character_name = ? AND item_name = ?",
-                           (user_id, char['name'], target_item))
-                
-                conn.commit()
+                async with get_async_db() as conn:
+                    all_items = await conn.fetch(
+                        "SELECT item_name FROM equipment WHERE user_id = $1 AND character_name = $2",
+                        user_id, char['name']
+                    )
+                    
+                    target_item = None
+                    for eq_item in all_items:
+                        if eq_item['item_name'].lower() == item.lower():
+                            target_item = eq_item['item_name']
+                            break
+                    
+                    if not target_item:
+                        await interaction.response.send_message(f"⚠️ Equipment item **{item}** not found", ephemeral=True)
+                        return
+                    
+                    await conn.execute(
+                        "DELETE FROM equipment WHERE user_id = $1 AND character_name = $2 AND item_name = $3",
+                        user_id, char['name'], target_item
+                    )
                 
                 embed = discord.Embed(
                     title="✅ Equipment Removed",
@@ -344,10 +312,11 @@ class CharacterInventory(commands.Cog):
                 logger.info(f"Removed equipment '{target_item}' from {char['name']} for user {user_id}")
                 
             elif action == "clear":
-                # Clear all equipment with confirmation
-                cur.execute("SELECT COUNT(*) as count FROM equipment WHERE user_id = ? AND character_name = ?",
-                           (user_id, char['name']))
-                count = cur.fetchone()['count']
+                async with get_async_db() as conn:
+                    count = await conn.fetchval(
+                        "SELECT COUNT(*) FROM equipment WHERE user_id = $1 AND character_name = $2",
+                        user_id, char['name']
+                    )
                 
                 if count == 0:
                     await interaction.response.send_message(f"⚠️ {char['name']} has no equipment to clear", ephemeral=True)
@@ -368,8 +337,6 @@ class CharacterInventory(commands.Cog):
         except Exception as e:
             logger.error(f"Error in equipment command: {e}")
             await interaction.response.send_message("❌ An error occurred while managing equipment", ephemeral=True)
-        finally:
-            conn.close()
 
     # ===== NOTES COMMANDS =====
 
@@ -398,65 +365,42 @@ class CharacterInventory(commands.Cog):
         user_id = str(interaction.user.id)
         
         try:
-            # Use fuzzy character matching
             char = await find_character(user_id, character)
             
             if not char:
                 await interaction.response.send_message(f"⚠️ No character named **{character}** found", ephemeral=True)
                 return
             
-            conn = get_db_connection()
-            cur = conn.cursor()
-            
-            # Create notes table if it doesn't exist
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS notes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT NOT NULL,
-                    character_name TEXT NOT NULL,
-                    title TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id, character_name) REFERENCES characters(user_id, name) ON DELETE CASCADE
-                )
-            """)
-            
             if action == "view":
-                # Show all notes
-                cur.execute("""
-                    SELECT title, content, created_at 
-                    FROM notes 
-                    WHERE user_id = ? AND character_name = ? 
-                    ORDER BY created_at DESC
-                """, (user_id, char['name']))
-                
-                notes_list = cur.fetchall()
+                async with get_async_db() as conn:
+                    notes_list = await conn.fetch(
+                        "SELECT title, content, created_at FROM notes WHERE user_id = $1 AND character_name = $2 ORDER BY created_at DESC",
+                        user_id, char['name']
+                    )
                 
                 embed = discord.Embed(
                     title=f"📓 {char['name']}'s Notes",
-                    color=0x4169E1
+                    color=0x8B4513
                 )
                 
                 if not notes_list:
                     embed.description = "*No notes recorded*"
                     embed.add_field(
-                        name="💡 Add Notes",
-                        value="Use `/notes character:Name action:add title:\"Note Title\" content:\"Note content\"`",
+                        name="💡 Add Note",
+                        value="Use `/notes character:Name action:add title:\"Title\" content:\"Content\"`",
                         inline=False
                     )
                 else:
-                    for i, note in enumerate(notes_list[:5]):  # Show last 5 notes
-                        date_str = note['created_at'][:10]  # Just the date
+                    for note in notes_list[:10]:
                         note_preview = note['content'][:100] + "..." if len(note['content']) > 100 else note['content']
-                        
                         embed.add_field(
-                            name=f"📝 {note['title']} ({date_str})",
+                            name=f"📝 {note['title']}",
                             value=note_preview,
                             inline=False
                         )
                     
-                    if len(notes_list) > 5:
-                        embed.set_footer(text=f"Showing 5 of {len(notes_list)} notes")
+                    if len(notes_list) > 10:
+                        embed.set_footer(text=f"Showing 10 of {len(notes_list)} notes")
                     else:
                         embed.set_footer(text=f"Total notes: {len(notes_list)}")
                 
@@ -464,24 +408,22 @@ class CharacterInventory(commands.Cog):
                 
             elif action == "add":
                 if not title or not content:
-                    await interaction.response.send_message("❌ Both title and content required for adding notes", ephemeral=True)
+                    await interaction.response.send_message("❌ Title and content required for adding notes", ephemeral=True)
                     return
                 
                 if len(title) > 100:
-                    await interaction.response.send_message("❌ Note title too long (max 100 characters)", ephemeral=True)
+                    await interaction.response.send_message("❌ Title too long (max 100 characters)", ephemeral=True)
                     return
                 
                 if len(content) > 2000:
-                    await interaction.response.send_message("❌ Note content too long (max 2000 characters)", ephemeral=True)
+                    await interaction.response.send_message("❌ Content too long (max 2000 characters)", ephemeral=True)
                     return
                 
-                # Add note
-                cur.execute("""
-                    INSERT INTO notes (user_id, character_name, title, content)
-                    VALUES (?, ?, ?, ?)
-                """, (user_id, char['name'], title, content))
-                
-                conn.commit()
+                async with get_async_db() as conn:
+                    await conn.execute(
+                        "INSERT INTO notes (user_id, character_name, title, content) VALUES ($1, $2, $3, $4)",
+                        user_id, char['name'], title, content
+                    )
                 
                 embed = discord.Embed(
                     title="✅ Note Added",
@@ -489,38 +431,37 @@ class CharacterInventory(commands.Cog):
                     color=0x228B22
                 )
                 
-                # Show preview of content
-                preview = content[:200] + "..." if len(content) > 200 else content
-                embed.add_field(name="📝 Content Preview", value=preview, inline=False)
+                content_preview = content[:200] + "..." if len(content) > 200 else content
+                embed.add_field(name="📝 Content Preview", value=content_preview, inline=False)
                 
                 await interaction.response.send_message(embed=embed, ephemeral=True)
                 logger.info(f"Added note '{title}' to {char['name']} for user {user_id}")
                 
             elif action == "remove":
                 if not title:
-                    await interaction.response.send_message("❌ Note title required for removal", ephemeral=True)
+                    await interaction.response.send_message("❌ Title required for removing notes", ephemeral=True)
                     return
                 
-                # Find and remove note (fuzzy matching)
-                cur.execute("SELECT title FROM notes WHERE user_id = ? AND character_name = ?", 
-                           (user_id, char['name']))
-                all_notes = cur.fetchall()
-                
-                # Find best match
-                target_title = None
-                for note in all_notes:
-                    if note['title'].lower() == title.lower():
-                        target_title = note['title']
-                        break
-                
-                if not target_title:
-                    await interaction.response.send_message(f"⚠️ Note **{title}** not found", ephemeral=True)
-                    return
-                
-                cur.execute("DELETE FROM notes WHERE user_id = ? AND character_name = ? AND title = ?",
-                           (user_id, char['name'], target_title))
-                
-                conn.commit()
+                async with get_async_db() as conn:
+                    all_notes = await conn.fetch(
+                        "SELECT title FROM notes WHERE user_id = $1 AND character_name = $2",
+                        user_id, char['name']
+                    )
+                    
+                    target_title = None
+                    for note in all_notes:
+                        if note['title'].lower() == title.lower():
+                            target_title = note['title']
+                            break
+                    
+                    if not target_title:
+                        await interaction.response.send_message(f"⚠️ Note **{title}** not found", ephemeral=True)
+                        return
+                    
+                    await conn.execute(
+                        "DELETE FROM notes WHERE user_id = $1 AND character_name = $2 AND title = $3",
+                        user_id, char['name'], target_title
+                    )
                 
                 embed = discord.Embed(
                     title="✅ Note Removed",
@@ -532,10 +473,11 @@ class CharacterInventory(commands.Cog):
                 logger.info(f"Removed note '{target_title}' from {char['name']} for user {user_id}")
                 
             elif action == "clear":
-                # Clear all notes with confirmation
-                cur.execute("SELECT COUNT(*) as count FROM notes WHERE user_id = ? AND character_name = ?",
-                           (user_id, char['name']))
-                count = cur.fetchone()['count']
+                async with get_async_db() as conn:
+                    count = await conn.fetchval(
+                        "SELECT COUNT(*) FROM notes WHERE user_id = $1 AND character_name = $2",
+                        user_id, char['name']
+                    )
                 
                 if count == 0:
                     await interaction.response.send_message(f"⚠️ {char['name']} has no notes to clear", ephemeral=True)
@@ -556,8 +498,6 @@ class CharacterInventory(commands.Cog):
         except Exception as e:
             logger.error(f"Error in notes command: {e}")
             await interaction.response.send_message("❌ An error occurred while managing notes", ephemeral=True)
-        finally:
-            conn.close()
 
     # ===== AUTOCOMPLETE FUNCTIONS =====
 
@@ -578,7 +518,6 @@ class CharacterInventory(commands.Cog):
         current: str,
     ) -> List[app_commands.Choice[str]]:
         """Autocomplete equipment item names for removal"""
-        # Only provide autocomplete for remove action
         if not hasattr(interaction, 'namespace') or interaction.namespace.action != "remove":
             return []
         
@@ -589,18 +528,15 @@ class CharacterInventory(commands.Cog):
             if not character:
                 return []
             
-            # Find character using fuzzy matching
             char = await find_character(user_id, character)
             if not char:
                 return []
             
-            conn = get_db_connection()
-            cur = conn.cursor()
-            
-            cur.execute("SELECT item_name FROM equipment WHERE user_id = ? AND character_name = ? ORDER BY item_name", 
-                       (user_id, char['name']))
-            items = cur.fetchall()
-            conn.close()
+            async with get_async_db() as conn:
+                items = await conn.fetch(
+                    "SELECT item_name FROM equipment WHERE user_id = $1 AND character_name = $2 ORDER BY item_name",
+                    user_id, char['name']
+                )
             
             filtered = [
                 item['item_name'] for item in items 
@@ -622,7 +558,6 @@ class CharacterInventory(commands.Cog):
         current: str,
     ) -> List[app_commands.Choice[str]]:
         """Autocomplete note titles for removal"""
-        # Only provide autocomplete for remove action
         if not hasattr(interaction, 'namespace') or interaction.namespace.action != "remove":
             return []
         
@@ -633,18 +568,15 @@ class CharacterInventory(commands.Cog):
             if not character:
                 return []
             
-            # Find character using fuzzy matching
             char = await find_character(user_id, character)
             if not char:
                 return []
             
-            conn = get_db_connection()
-            cur = conn.cursor()
-            
-            cur.execute("SELECT title FROM notes WHERE user_id = ? AND character_name = ? ORDER BY created_at DESC", 
-                       (user_id, char['name']))
-            notes_list = cur.fetchall()
-            conn.close()
+            async with get_async_db() as conn:
+                notes_list = await conn.fetch(
+                    "SELECT title FROM notes WHERE user_id = $1 AND character_name = $2 ORDER BY created_at DESC",
+                    user_id, char['name']
+                )
             
             filtered = [
                 note['title'] for note in notes_list 
@@ -665,7 +597,6 @@ async def setup(bot: commands.Bot):
     cog = CharacterInventory(bot)
     await bot.add_cog(cog)
     
-    # Only register guild commands if GUILD_ID is set (development mode)
     if GUILD_ID:
         for command in cog.get_app_commands():
             bot.tree.add_command(command, guild=discord.Object(id=GUILD_ID))

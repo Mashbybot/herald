@@ -1,8 +1,8 @@
 """
-Dice Rolling Cog for Herald Bot - Fixed with Inconnu-style formatting
+Dice Rolling Cog for Herald Bot - Async Version
 Handles H5E dice mechanics: basic rolls, character rolls, edge dice, desperation
 """
-import asyncio
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -17,8 +17,8 @@ from core.dice_utils import (
 from core.character_utils import (
     find_character, character_autocomplete, get_character_attribute, get_character_skill, ALL_SKILLS
 )
-from core.ui_utils import HeraldEmojis, HeraldMessages  # ← Moved to correct module
-from core.db import get_db_connection
+from core.ui_utils import HeraldEmojis, HeraldMessages
+from core.db import get_async_db
 from config.settings import GUILD_ID
 
 logger = logging.getLogger('Herald.Dice')
@@ -59,37 +59,26 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
     
     # === STEP 6: Danger warning (if present) ===
     if danger > 0:
-        embed.add_field(name="", value=f"⚠️ **Danger:** {danger}", inline=False)
+        embed.add_field(
+            name="",
+            value=f"⚠️ **Danger {danger}** active (adds +{danger} to difficulty)",
+            inline=False
+        )
     
-    # === STEP 7: Margin display ===
-    embed.add_field(name="", value=margin_text, inline=False)
-    
-    # === STEP 8: Visual dice display ===
+    # === STEP 7: Dice display ===
     dice_display = create_inconnu_dice_display(result)
     if dice_display:
         embed.add_field(name="", value=dice_display, inline=False)
     
-    # === STEP 9: Three-column layout (numbers only) ===
-    total_dice = len(result.dice) + len(result.edge_dice)
-    embed.add_field(name="**Dice**", value=str(total_dice), inline=True)
+    # === STEP 8: Margin if difficulty was set ===
+    if difficulty > 0:
+        embed.add_field(name="", value=margin_text, inline=False)
     
-    # Desperation column
-    if result.desperation_dice:
-        desperation_value = str(len(result.desperation_dice))
-        if result.messy_critical:
-            desperation_value += " ⚠️"
-    else:
-        desperation_value = "0"
-    embed.add_field(name="**Desperation**", value=desperation_value, inline=True)
-    
-    # Difficulty column
-    embed.add_field(name="**Difficulty**", value=str(difficulty) if difficulty > 0 else "0", inline=True)
-    
-    # === STEP 10: Messy critical warning ===
+    # === STEP 9: Desperation warning ===
     if result.messy_critical:
         embed.add_field(
             name="",
-            value="⚠️ **Messy Critical!** Desperation dice contributed to success.",
+            value=f"💀 **Messy Critical!** Desperation dice contributed to success.",
             inline=False
         )
     
@@ -156,26 +145,31 @@ class DiceRolling(commands.Cog):
         desperation: bool = False,
         modifier: int = 0
     ):
-        """Roll dice with H5E mechanics"""
+        """Roll dice using H5E mechanics"""
         
         # Validate inputs
-        if attribute < 0 or attribute > 5:
-            await interaction.response.send_message(f"{HeraldEmojis.ERROR} Attribute must be 0-5", ephemeral=True)
+        if attribute < 0 or attribute > 10:
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Attribute must be 0-10", 
+                ephemeral=True
+            )
             return
         
-        if skill < 0 or skill > 5:
-            await interaction.response.send_message(f"{HeraldEmojis.ERROR} Skill must be 0-5", ephemeral=True)
+        if skill < 0 or skill > 10:
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Skill must be 0-10", 
+                ephemeral=True
+            )
             return
         
         if edge < 0 or edge > 10:
-            await interaction.response.send_message(f"{HeraldEmojis.ERROR} Edge must be 0-10", ephemeral=True)
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Edge must be 0-10", 
+                ephemeral=True
+            )
             return
         
         try:
-            # Calculate effective pool (no danger for manual rolls)
-            base_pool = attribute + skill + modifier
-            effective_pool = max(1, base_pool)
-            
             # Roll the dice
             result = roll_pool(attribute, skill, desperation, edge, 0)
             
@@ -192,14 +186,14 @@ class DiceRolling(commands.Cog):
             if desperation:
                 pool_parts.append("Desperation")
             
-            description = " + ".join(pool_parts) if pool_parts else "Manual Roll"
-            description += f" = {effective_pool} dice"
+            effective_pool = max(1, attribute + skill + modifier)
+            description = " + ".join(pool_parts) + f" = {effective_pool} dice"
             
             if difficulty > 0:
                 description += f" vs Difficulty {difficulty}"
             
-            # Format and send result (no danger for manual rolls)
-            embed = format_dice_result(result, description, difficulty=difficulty, danger=0)
+            # Format and send result
+            embed = format_dice_result(result, description, difficulty=difficulty)
             await interaction.response.send_message(embed=embed)
             
             logger.info(f"Manual roll: {description} -> {result.total_successes} successes")
@@ -285,7 +279,10 @@ class DiceRolling(commands.Cog):
             
             # Validate edge override
             if edge < 0 or edge > 10:
-                await interaction.response.send_message(f"{HeraldEmojis.ERROR} Edge must be 0-10", ephemeral=True)
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} Edge must be 0-10", 
+                    ephemeral=True
+                )
                 return
             
             # Roll the dice
@@ -350,7 +347,6 @@ class DiceRolling(commands.Cog):
             result_dict = simple_roll(pool)
             
             # Convert to DiceResult format for consistency
-            from core.dice import DiceResult
             dice_result = DiceResult(result_dict['dice'])
             
             # Use same formatter but simpler description
@@ -479,7 +475,6 @@ class DiceRolling(commands.Cog):
     ):
         """Manage character-specific Danger ratings"""
         user_id = str(interaction.user.id)
-        conn = None
         
         try:
             # Find character using fuzzy matching
@@ -489,140 +484,118 @@ class DiceRolling(commands.Cog):
                 await interaction.response.send_message(error_msg, ephemeral=True)
                 return
             
-            # Ensure danger column exists
-            conn = get_db_connection()
-            cur = conn.cursor()
-            
-            # Check if danger column exists, add if not
-            cur.execute("PRAGMA table_info(characters)")
-            columns = [row[1] for row in cur.fetchall()]
-            
-            if 'danger' not in columns:
-                logger.info("Adding danger column to characters table")
-                cur.execute("ALTER TABLE characters ADD COLUMN danger INTEGER DEFAULT 0 CHECK(danger >= 0 AND danger <= 5)")
-                conn.commit()
-            
             # Get current danger
-            cur.execute("SELECT danger FROM characters WHERE user_id = ? AND name = ?", (user_id, char['name']))
-            result = cur.fetchone()
-            current_danger = result['danger'] if result and result['danger'] is not None else 0
+            current_danger = char.get('danger', 0) or 0
             
+            # Handle different actions
             if action == "view":
-                # Display current danger
-                embed = discord.Embed(
-                    title=f"⚠️ {char['name']}'s Danger Rating",
-                    color=0xFF4500 if current_danger >= 4 else 0xFFD700 if current_danger >= 2 else 0x4169E1
-                )
-                
-                # Create danger bar
                 danger_filled = "🔴" * current_danger
                 danger_empty = "⚫" * (5 - current_danger)
                 danger_bar = f"{danger_filled}{danger_empty}"
                 
-                embed.add_field(
-                    name="Current Rating",
-                    value=f"**{current_danger}/5**\n{danger_bar}",
-                    inline=False
+                embed = discord.Embed(
+                    title=f"⚠️ {char['name']}'s Danger",
+                    description=f"**Current Rating:** {current_danger}/5\n{danger_bar}",
+                    color=0xFF4500 if current_danger >= 4 else 0xFFD700 if current_danger >= 2 else 0x4169E1
                 )
                 
                 embed.add_field(
-                    name="Danger Effects",
-                    value=(
-                        "• **0:** No supernatural threat\n"
-                        "• **1:** Minor paranormal activity\n"
-                        "• **2:** Moderate supernatural danger\n"
-                        "• **3:** High paranormal threat\n"
-                        "• **4:** Extreme supernatural peril\n"
-                        "• **5:** Reality-warping horror"
-                    ),
+                    name="What is Danger?",
+                    value="Danger represents supernatural peril in the scene. It adds to the difficulty of all rolls.",
                     inline=False
                 )
                 
-                embed.add_field(
-                    name="Usage",
-                    value=f"This danger rating will be automatically added to all of {char['name']}'s rolls.",
-                    inline=False
-                )
+                if current_danger > 0:
+                    embed.add_field(
+                        name="Current Effect",
+                        value=f"+{current_danger} to all roll difficulties",
+                        inline=False
+                    )
                 
                 await interaction.response.send_message(embed=embed)
-                
-            else:
-                # Actions that modify danger require amount
-                if action != "reset" and amount is None:
+                return
+            
+            # For other actions, calculate new danger value
+            if action == "reset":
+                new_danger = 0
+            elif action == "set":
+                if amount is None:
                     await interaction.response.send_message(
-                        f"{HeraldEmojis.WARNING} Amount required for **{action}** action", 
+                        f"{HeraldEmojis.ERROR} Please specify an amount for set action",
                         ephemeral=True
                     )
                     return
-                
-                # Calculate new danger
-                if action == "set":
-                    new_danger = amount
-                elif action == "add":
-                    new_danger = current_danger + amount
-                elif action == "subtract":
-                    new_danger = current_danger - amount
-                elif action == "reset":
-                    new_danger = 0
-                
-                # Validate range (0-5)
-                new_danger = max(0, min(5, new_danger))
-                
-                # Update database
-                cur.execute("""
+                new_danger = max(0, min(amount, 5))
+            elif action == "add":
+                if amount is None:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Please specify an amount for add action",
+                        ephemeral=True
+                    )
+                    return
+                new_danger = max(0, min(current_danger + amount, 5))
+            else:  # subtract
+                if amount is None:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Please specify an amount for subtract action",
+                        ephemeral=True
+                    )
+                    return
+                new_danger = max(0, current_danger - amount)
+            
+            # Update database with async
+            async with get_async_db() as conn:
+                await conn.execute("""
                     UPDATE characters 
-                    SET danger = ? 
-                    WHERE user_id = ? AND name = ?
-                """, (new_danger, user_id, char['name']))
-                conn.commit()
-                
-                # Create response
-                change = new_danger - current_danger
-                change_text = f"+{change}" if change > 0 else str(change) if change < 0 else "±0"
-                
-                danger_filled = "🔴" * new_danger
-                danger_empty = "⚫" * (5 - new_danger)
-                danger_bar = f"{danger_filled}{danger_empty}"
-                
-                embed = discord.Embed(
-                    title=f"⚠️ {char['name']}'s Danger Updated",
-                    description=f"**{current_danger} → {new_danger}** ({change_text})",
-                    color=0xFF4500 if new_danger >= 4 else 0xFFD700 if new_danger >= 2 else 0x4169E1
-                )
-                
+                    SET danger = $1
+                    WHERE user_id = $2 AND name = $3
+                """, new_danger, user_id, char['name'])
+            
+            # Create response
+            change = new_danger - current_danger
+            change_text = f"+{change}" if change > 0 else str(change) if change < 0 else "±0"
+            
+            danger_filled = "🔴" * new_danger
+            danger_empty = "⚫" * (5 - new_danger)
+            danger_bar = f"{danger_filled}{danger_empty}"
+            
+            embed = discord.Embed(
+                title=f"⚠️ {char['name']}'s Danger Updated",
+                description=f"**{current_danger} → {new_danger}** ({change_text})",
+                color=0xFF4500 if new_danger >= 4 else 0xFFD700 if new_danger >= 2 else 0x4169E1
+            )
+            
+            embed.add_field(
+                name="New Rating",
+                value=f"**{new_danger}/5**\n{danger_bar}",
+                inline=False
+            )
+            
+            if new_danger >= 4 and current_danger < 4:
                 embed.add_field(
-                    name="New Rating",
-                    value=f"**{new_danger}/5**\n{danger_bar}",
+                    name="⚠️ High Danger!",
+                    value="Your character is now in extreme supernatural peril!",
                     inline=False
                 )
-                
-                if new_danger >= 4 and current_danger < 4:
-                    embed.add_field(
-                        name="⚠️ High Danger!",
-                        value="Your character is now in extreme supernatural peril!",
-                        inline=False
-                    )
-                elif new_danger == 0 and current_danger > 0:
-                    embed.add_field(
-                        name="✅ Safety Restored",
-                        value="Your character is no longer in supernatural danger.",
-                        inline=False
-                    )
-                
-                await interaction.response.send_message(embed=embed)
-                logger.info(f"Updated danger for {char['name']}: {current_danger} → {new_danger} (user {user_id})")
-                
+            elif new_danger == 0 and current_danger > 0:
+                embed.add_field(
+                    name="✅ Safety Restored",
+                    value="Your character is no longer in supernatural danger.",
+                    inline=False
+                )
+            
+            await interaction.response.send_message(embed=embed)
+            logger.info(f"Updated danger for {char['name']}: {current_danger} → {new_danger} (user {user_id})")
+            
         except Exception as e:
             logger.error(f"Error in danger command: {e}")
             await interaction.response.send_message(
                 f"{HeraldEmojis.ERROR} An error occurred while managing Danger rating", 
                 ephemeral=True
             )
-        finally:
-            if conn:
-                conn.close()
 
-    # Autocomplete functions
+    # ===== AUTOCOMPLETE FUNCTIONS =====
+
     @roll_character.autocomplete('character')
     @rouse_check.autocomplete('character')
     @danger_command.autocomplete('character')
