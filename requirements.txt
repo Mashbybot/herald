@@ -1,16 +1,26 @@
 # Core Discord bot dependencies
-discord.py>=2.3.0,<3.0.0
-python-dotenv>=1.0.0
+discord.py==2.4.0
+python-dotenv==1.0.1
 
 # Database dependencies
-# SQLite is built into Python, but we need PostgreSQL for production
-asyncpg>=0.28.0
+# SQLite async support
+aiosqlite==0.20.0
+# PostgreSQL for production
+asyncpg==0.29.0
 
-# Optional but recommended for production
-aiohttp>=3.8.0        # HTTP client (used by discord.py)
-typing-extensions>=4.0.0  # Type hints compatibility
+# HTTP client (used by discord.py)
+aiohttp==3.9.5
+
+# Type hints compatibility
+typing-extensions==4.12.2
+
+# Development dependencies (optional)
+# Uncomment for development environment:
+# pytest==8.3.2
+# pytest-asyncio==0.23.8
+# pytest-cov==5.0.0
 
 # Production monitoring and logging (optional)
 # Uncomment these if you want advanced monitoring:
-# sentry-sdk>=1.32.0    # Error tracking and monitoring
-# psutil>=5.9.0         # System resource monitoring
+# sentry-sdk==2.13.0    # Error tracking and monitoring
+# psutil==6.0.0         # System resource monitoring
