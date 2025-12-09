@@ -13,10 +13,10 @@ import logging
 
 from core.db import get_async_db
 from core.character_utils import (
-    find_character, character_autocomplete, get_character_and_skills, 
-    ensure_h5e_columns, ALL_SKILLS, H5E_SKILLS, HeraldMessages
+    find_character, character_autocomplete, get_character_and_skills,
+    ensure_h5e_columns, ALL_SKILLS, H5E_SKILLS
 )
-from core.ui_utils import create_health_bar, create_willpower_bar
+from core.ui_utils import create_health_bar, create_willpower_bar, HeraldColors, HeraldMessages
 from config.settings import GUILD_ID
 
 logger = logging.getLogger('Herald.Character.Management')
@@ -65,13 +65,13 @@ class DeleteConfirmationView(discord.ui.View):
                     )
                     return
             
-            
+
             embed = discord.Embed(
-                title="✅ Character Deleted",
+                title=f"🔸 Pattern purged: {self.character_name}",
                 description=f"**{self.character_name}** has been permanently deleted",
-                color=0x228B22
+                color=HeraldColors.SUCCESS
             )
-            
+
             embed.add_field(
                 name="Data Removed",
                 value="• Character sheet\n• All skill ratings\n• Equipment and notes",
@@ -247,41 +247,45 @@ class CharacterManagement(commands.Cog):
                         user_id, name, skill
                     )
 
-            # Success response with character summary
+            # Success response with Herald's voice
             embed = discord.Embed(
-                title="✅ Character Created",
-                description=f"**{name}** is ready for the hunt!",
-                color=0x228B22
+                title="🔸 Hunter Identified",
+                description=(
+                    f"{HeraldMessages.QUERY_RECOGNIZED}: Hunter identified\n"
+                    f"{HeraldMessages.PROTOCOL_ESTABLISHED}: {name}\n"
+                    f"{HeraldMessages.PATTERN_LOGGED}: Ready for deployment"
+                ),
+                color=HeraldColors.ORANGE
             )
-            
+
             # Physical attributes
             embed.add_field(
                 name="Physical",
                 value=f"💪 Strength: {strength}\n🤸 Dexterity: {dexterity}\n❤️ Stamina: {stamina}",
                 inline=True
             )
-            
+
             # Social attributes
             embed.add_field(
                 name="Social",
                 value=f"✨ Charisma: {charisma}\n🎭 Manipulation: {manipulation}\n🧘 Composure: {composure}",
                 inline=True
             )
-            
+
             # Mental attributes
             embed.add_field(
                 name="Mental",
                 value=f"🧠 Intelligence: {intelligence}\n⚡ Wits: {wits}\n🎯 Resolve: {resolve}",
                 inline=True
             )
-            
+
             # Derived stats
             embed.add_field(
                 name="Derived Stats",
                 value=f"❤️ Health: {health}\n💙 Willpower: {willpower}",
                 inline=False
             )
-            
+
             # Touchstones (if provided)
             if ambition or desire or drive:
                 touchstones_text = []
@@ -291,14 +295,14 @@ class CharacterManagement(commands.Cog):
                     touchstones_text.append(f"**Desire:** {desire}")
                 if drive:
                     touchstones_text.append(f"**Drive:** {drive}")
-                
+
                 embed.add_field(
                     name="Touchstones",
                     value="\n".join(touchstones_text),
                     inline=False
                 )
-            
-            embed.set_footer(text="Use /skill to add skills • Use /sheet to view your character")
+
+            embed.set_footer(text=HeraldMessages.CATCHPHRASE)
             
             await interaction.response.send_message(embed=embed)
             self.logger.info(f"Created character '{name}' for user {user_id}")
@@ -406,12 +410,12 @@ class CharacterManagement(commands.Cog):
                         pass
             
             embed = discord.Embed(
-                title="✅ Character Renamed",
+                title=f"🔸 Identity updated: {character['name']} → {new_name}",
                 description=f"**{character['name']}** is now **{new_name}**",
-                color=0x228B22
+                color=HeraldColors.SUCCESS
             )
-            
-            embed.set_footer(text="All skills and character data have been preserved")
+
+            embed.set_footer(text=f"{HeraldMessages.SUCCESS_LOGGED} - All data preserved")
             
             await interaction.response.send_message(embed=embed, ephemeral=True)
             self.logger.info(f"Renamed character '{character['name']}' to '{new_name}' for user {user_id}")
@@ -444,11 +448,11 @@ class CharacterManagement(commands.Cog):
             
             # Convert asyncpg Records to list of character names
             char_list = "\n".join([f"• {char['name']}" for char in characters])
-            
+
             embed = discord.Embed(
-                title="📋 Your Characters",
+                title="🔸 Active Hunters",
                 description=char_list,
-                color=0x4169E1
+                color=HeraldColors.ORANGE
             )
             embed.set_footer(text="Use /sheet <name> to view a character sheet")
             
@@ -584,7 +588,7 @@ class CharacterManagement(commands.Cog):
                     inline=False
                 )
             
-            embed.set_footer(text="Use /skill to modify skills • Use /damage to track damage")
+            embed.set_footer(text="🔸 Pattern current | Use /help for operations")
             
             await interaction.response.send_message(embed=embed)
             
@@ -594,9 +598,70 @@ class CharacterManagement(commands.Cog):
                 f"❌ Error loading character sheet: {str(e)}", ephemeral=True
             )
 
+    @app_commands.command(name="about", description="About Herald - Hunter character management system")
+    async def about_command(self, interaction: discord.Interaction):
+        """Display information about Herald bot"""
+
+        # Get character count for this guild if possible
+        try:
+            async with get_async_db() as conn:
+                char_count = await conn.fetchval(
+                    "SELECT COUNT(*) FROM characters"
+                )
+        except Exception:
+            char_count = "Unknown"
+
+        embed = discord.Embed(
+            title="🔸 Herald the Reckoning",
+            description=(
+                f"{HeraldMessages.PROTOCOL_ESTABLISHED}\n"
+                f"{HeraldMessages.QUERY_RECOGNIZED}: System information requested\n\n"
+                "**Mission:** Herald the Reckoning\n\n"
+                "Built by Hunters, for Hunters.\n"
+                "The Reckoning doesn't wait for official tools.\n"
+            ),
+            color=HeraldColors.ORANGE
+        )
+
+        embed.add_field(
+            name="🔸 System Status",
+            value=(
+                f"**Version:** 2.0\n"
+                f"**Active Hunters:** {char_count}\n"
+                f"**Database:** PostgreSQL (Async)\n"
+                f"**Engine:** Hunter: The Reckoning 5E"
+            ),
+            inline=False
+        )
+
+        embed.add_field(
+            name="🔸 Core Operations",
+            value=(
+                "• Character management\n"
+                "• Dice rolling (H5E mechanics)\n"
+                "• Edge & Desperation tracking\n"
+                "• Experience & progression\n"
+                "• Equipment & notes"
+            ),
+            inline=True
+        )
+
+        embed.add_field(
+            name="🔸 Investigation",
+            value=(
+                "Some truths are earned through investigation.\n\n"
+                "Use `/help` to access operational protocols."
+            ),
+            inline=False
+        )
+
+        embed.set_footer(text=HeraldMessages.CATCHPHRASE)
+
+        await interaction.response.send_message(embed=embed)
+
     # Autocomplete functions
     @delete_character.autocomplete('name')
-    @rename_character.autocomplete('old_name') 
+    @rename_character.autocomplete('old_name')
     @character_sheet.autocomplete('name')
     async def management_character_autocomplete(
         self,

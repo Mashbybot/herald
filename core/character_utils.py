@@ -263,19 +263,19 @@ async def character_autocomplete(interaction: discord.Interaction, current: str)
 # ===== MESSAGE SYSTEM EXTENSIONS =====
 
 async def character_not_found_message(user_id: str, character_name: str) -> str:
-    """Enhanced character not found message with suggestions and caching"""
+    """Enhanced character not found message with Herald's analytical voice"""
     # Import here to avoid circular dependency
-    from core.ui_utils import HeraldEmojis
-    
+    from core.ui_utils import HeraldMessages
+
     cache_key = f"user_chars:{user_id}"
     user_characters = _character_cache.get(cache_key)
-    
+
     if user_characters is None:
         try:
             from core.db import get_async_db
             async with get_async_db() as conn:
                 rows = await conn.fetch(
-                    "SELECT name FROM characters WHERE user_id = $1 ORDER BY name", 
+                    "SELECT name FROM characters WHERE user_id = $1 ORDER BY name",
                     user_id
                 )
                 user_characters = [row['name'] for row in rows]
@@ -283,20 +283,20 @@ async def character_not_found_message(user_id: str, character_name: str) -> str:
         except Exception as e:
             logger.error(f"Error getting user characters: {e}")
             user_characters = []
-    
-    base_msg = f"{HeraldEmojis.WARNING} Character **{character_name}** not found."
-    
+
+    base_msg = f"{HeraldMessages.QUERY_FAILED}: No Hunter matches pattern \"{character_name}\""
+
     if user_characters:
         if len(user_characters) == 1:
-            suggestion = f"\nDid you mean **{user_characters[0]}**?"
+            suggestion = f"\nAnalysis: Did you mean **{user_characters[0]}**?"
         elif len(user_characters) <= 3:
             names = "**, **".join(user_characters)
-            suggestion = f"\nYour characters: **{names}**"
+            suggestion = f"\nAnalysis: Your Hunters: **{names}**"
         else:
-            suggestion = f"\nUse `/characters` to see your {len(user_characters)} characters"
+            suggestion = f"\nAnalysis: Use `/characters` to see your {len(user_characters)} Hunters"
     else:
-        suggestion = f"\nCreate your first character with `/create name:\"Character Name\"`"
-    
+        suggestion = f"\nAnalysis: Create your first Hunter with `/create name:\"Character Name\"`"
+
     return base_msg + suggestion
 
 

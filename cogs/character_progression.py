@@ -11,6 +11,7 @@ import logging
 
 from core.db import get_async_db
 from core.character_utils import find_character, character_autocomplete, ALL_SKILLS
+from core.ui_utils import HeraldColors, HeraldMessages
 from config.settings import GUILD_ID
 
 logger = logging.getLogger('Herald.Character.Progression')
@@ -1185,13 +1186,13 @@ class CharacterProgression(commands.Cog):
         
         if topic == "start":
             embed = discord.Embed(
-                title="🏹 Welcome to Herald",
-                description="Herald is your assistant for Hunter: The Reckoning 5th Edition gameplay!",
-                color=0x8B0000
+                title="🔸 Herald Protocol",
+                description=f"{HeraldMessages.QUERY_RECOGNIZED}: Assistance requested\n\nHerald is your assistant for Hunter: The Reckoning 5th Edition gameplay!",
+                color=HeraldColors.ORANGE
             )
-            
+
             embed.add_field(
-                name="🎯 Quick Start",
+                name="🔸 Operations available",
                 value=(
                     "1. Create a character: `/create`\n"
                     "2. View character sheet: `/sheet`\n"
@@ -1200,7 +1201,7 @@ class CharacterProgression(commands.Cog):
                 ),
                 inline=False
             )
-            
+
             embed.add_field(
                 name="🎯 Help Topics",
                 value=(
@@ -1215,8 +1216,8 @@ class CharacterProgression(commands.Cog):
                 ),
                 inline=False
             )
-            
-            embed.set_footer(text="Made for Hunter: The Reckoning 5th Edition")
+
+            embed.set_footer(text=HeraldMessages.CATCHPHRASE)
             
         elif topic == "commands":
             embed = discord.Embed(
@@ -1312,301 +1313,6 @@ class CharacterProgression(commands.Cog):
         if improvement_type == "skill" or improvement_type is None:
             targets.extend(ALL_SKILLS)
         
-        filtered = [
-            target for target in targets 
-            if current.lower() in target.lower()
-        ]
-        
-        return [
-            app_commands.Choice(name=target, value=target)
-            for target in filtered[:25]
-        ]
-
-
-                    "**Set XP:** `/xp character:Name action:set amount:20`\n"
-                    "**View Log:** `/xp_log character:Name limit:10`"
-                ),
-                inline=False
-            )
-            
-            embed.add_field(
-                name="🎯 Spending XP",
-                value=(
-                    "**Improve Attribute:**\n"
-                    "`/spend_xp character:Name improvement_type:attribute target:Strength new_rating:3`\n\n"
-                    "**Improve Skill:**\n"
-                    "`/spend_xp character:Name improvement_type:skill target:Investigation new_rating:2`"
-                ),
-                inline=False
-            )
-            
-            embed.add_field(
-                name="💎 H5E Costs",
-                value=(
-                    "• **Attributes:** New rating × 4 XP\n"
-                    "• **Skills:** New rating × 2 XP\n"
-                    "• Can only increase by 1 dot at a time\n"
-                    "• Derived stats update automatically"
-                ),
-                inline=False
-            )
-            
-        elif topic == "mechanics":
-            embed = discord.Embed(
-                title="🏹 Hunter Mechanics Help", 
-                color=0x8B4513
-            )
-            
-            embed.add_field(
-                name="⚡ Edge",
-                value=(
-                    "**View/Set:** `/edge character:Name action:view`\n"
-                    "**Modify:** `/edge character:Name action:add amount:1`\n\n"
-                    "Edge adds dice to Danger rolls and provides supernatural resistance."
-                ),
-                inline=False
-            )
-            
-            embed.add_field(
-                name="🌑 Desperation",
-                value=(
-                    "**View/Set:** `/desperation character:Name action:view`\n"
-                    "**Modify:** `/desperation character:Name action:add amount:1`\n\n"
-                    "High Desperation (7+) adds Desperation dice to failed rolls."
-                ),
-                inline=False
-            )
-            
-            embed.add_field(
-                name="🗡️ Creed & Character Goals",
-                value=(
-                    "**Creed:** `/creed character:Name creed:\"Innocent\"`\n"
-                    "**Ambition:** `/ambition character:Name ambition:\"Long-term goal\"`\n"
-                    "**Desire:** `/desire character:Name desire:\"Short-term goal\"`\n"
-                    "**Drive:** `/drive character:Name drive:\"Why you hunt\"`\n\n"
-                    "Common Creeds: Innocent, Martyr, Redeemer, Visionary, Wayward"
-                ),
-                inline=False
-            )
-            
-            embed.add_field(
-                name="🎯 Specialties",
-                value=(
-                    "**View:** `/specialty character:Name action:view`\n"
-                    "**Add:** `/specialty character:Name action:add skill:Athletics specialty:\"Running\"`\n"
-                    "**Bulk Add:** `/specialty_bulk character:Name specialty_list:\"Athletics:Running,Firearms:Pistols\"`\n\n"
-                    "Specialties give bonus dice when they apply to rolls."
-                ),
-                inline=False
-            )
-            
-        elif topic == "extras":
-            embed = discord.Embed(
-                title="🎒 Equipment & Notes Help",
-                color=0x8B4513
-            )
-            
-            embed.add_field(
-                name="🎒 Equipment",
-                value=(
-                    "**View:** `/equipment character:Name action:view`\n"
-                    "**Add:** `/equipment character:Name action:add item:\"Shotgun\" description:\"12-gauge\"`\n"
-                    "**Remove:** `/equipment character:Name action:remove item:\"Shotgun\"`\n"
-                    "**Clear:** `/equipment character:Name action:clear`"
-                ),
-                inline=False
-            )
-            
-            embed.add_field(
-                name="📓 Notes",
-                value=(
-                    "**View:** `/notes character:Name action:view`\n"
-                    "**Add:** `/notes character:Name action:add title:\"Session 1\" content:\"We met the vampire...\"`\n"
-                    "**Remove:** `/notes character:Name action:remove title:\"Session 1\"`\n"
-                    "**Clear:** `/notes character:Name action:clear`"
-                ),
-                inline=False
-            )
-            
-            embed.add_field(
-                name="💡 Tips",
-                value=(
-                    "• Use quotes for multi-word names/titles\n"
-                    "• Equipment supports optional descriptions\n"
-                    "• Notes are limited to 2000 characters\n"
-                    "• Both systems support fuzzy name matching"
-                ),
-                inline=False
-            )
-            
-        elif topic == "commands":
-            embed = discord.Embed(
-                title="📜 All Commands Reference",
-                color=0x4169E1
-            )
-            
-            embed.add_field(
-                name="🏗️ Character Creation & Management",
-                value=(
-                    "`/create` - Create new character\n"
-                    "`/delete` - Delete character (with confirmation)\n"
-                    "`/rename` - Rename character\n"
-                    "`/characters` - List your characters\n"
-                    "`/sheet` - View character sheet"
-                ),
-                inline=False
-            )
-            
-            embed.add_field(
-                name="🎲 Dice Rolling",
-                value=(
-                    "`/roll` - Manual dice roll\n"
-                    "`/roll_char` - Character-based roll\n"
-                    "`/simple` - Simple dice pool\n"
-                    "`/rouse` - Rouse check for desperation"
-                ),
-                inline=False
-            )
-            
-            embed.add_field(
-                name="🎯 Character Development",
-                value=(
-                    "`/skill_set` - Set skill dots\n"
-                    "`/skill_template` - Apply H5E skill templates\n"
-                    "`/skill_bulk` - Set multiple skills at once\n"
-                    "`/specialty` - Manage skill specialties\n"
-                    "`/specialty_bulk` - Add multiple specialties\n"
-                    "`/xp` - Manage experience points\n"
-                    "`/spend_xp` - Spend XP for improvements\n"
-                    "`/xp_log` - View XP transaction history"
-                ),
-                inline=False
-            )
-            
-            embed.add_field(
-                name="🏹 Hunter Mechanics",
-                value=(
-                    "`/edge` - Manage Edge rating\n"
-                    "`/desperation` - Manage Desperation level\n"
-                    "`/creed` - Set/view character Creed\n"
-                    "`/ambition` - Set long-term goals\n"
-                    "`/desire` - Set short-term goals\n"
-                    "`/drive` - Set hunting motivation\n"
-                    "`/damage` - Apply damage\n"
-                    "`/heal` - Heal damage"
-                ),
-                inline=False
-            )
-            
-            embed.add_field(
-                name="🎒 Extras",
-                value=(
-                    "`/equipment` - Manage character equipment\n"
-                    "`/notes` - Manage character notes/journal\n"
-                    "`/help` - This help system"
-                ),
-                inline=False
-            )
-        
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    # ===== AUTOCOMPLETE FUNCTIONS =====
-
-    @skill_set.autocomplete('character_name')
-    @skill_template.autocomplete('character')
-    @skill_bulk.autocomplete('character')
-    @specialty.autocomplete('character')
-    @specialty_bulk.autocomplete('character')
-    @experience_points.autocomplete('character')
-    @spend_xp.autocomplete('character')
-    @xp_log.autocomplete('character')
-    async def progression_character_autocomplete(
-        self,
-        interaction: discord.Interaction,
-        current: str,
-    ) -> List[app_commands.Choice[str]]:
-        """Autocomplete character names for progression commands"""
-        return await character_autocomplete(interaction, current)
-
-    @specialty.autocomplete('skill')
-    async def specialty_skill_autocomplete(
-        self,
-        interaction: discord.Interaction,
-        current: str,
-    ) -> List[app_commands.Choice[str]]:
-        """Autocomplete skill names for specialty command"""
-        filtered = [
-            skill for skill in ALL_SKILLS 
-            if current.lower() in skill.lower()
-        ]
-        
-        return [
-            app_commands.Choice(name=skill, value=skill)
-            for skill in filtered[:25]
-        ]
-
-    @specialty.autocomplete('specialty')
-    async def specialty_name_autocomplete(
-        self,
-        interaction: discord.Interaction,
-        current: str,
-    ) -> List[app_commands.Choice[str]]:
-        """Autocomplete existing specialty names for removal"""
-        user_id = str(interaction.user.id)
-        
-        # Get character and skill from namespace
-        character = getattr(interaction.namespace, 'character', None)
-        skill = getattr(interaction.namespace, 'skill', None)
-        
-        if not character or not skill:
-            return []
-        
-        try:
-            char = await find_character(user_id, character)
-            if not char:
-                return []
-            
-            async with get_async_db() as conn:
-                specialties = await conn.fetch("""
-                    SELECT specialty_name 
-                    FROM specialties 
-                    WHERE user_id = $1 AND character_name = $2 AND skill_name = $3
-                    ORDER BY specialty_name
-                """, user_id, char['name'], skill)
-            
-            filtered = [
-                spec['specialty_name'] for spec in specialties 
-                if current.lower() in spec['specialty_name'].lower()
-            ]
-            
-            return [
-                app_commands.Choice(name=specialty_name, value=specialty_name)
-                for specialty_name in filtered[:25]
-            ]
-        except Exception as e:
-            logger.error(f"Error in specialty name autocomplete: {e}")
-            return []
-
-    @spend_xp.autocomplete('target')
-    async def spend_xp_target_autocomplete(
-        self,
-        interaction: discord.Interaction,
-        current: str,
-    ) -> List[app_commands.Choice[str]]:
-        """Autocomplete attribute and skill names for spending XP"""
-        # Get the improvement type to filter appropriately
-        improvement_type = getattr(interaction.namespace, 'improvement_type', None)
-        
-        targets = []
-        
-        if improvement_type == "attribute" or improvement_type is None:
-            attributes = ["Strength", "Dexterity", "Stamina", "Charisma", "Manipulation", "Composure", "Intelligence", "Wits", "Resolve"]
-            targets.extend(attributes)
-        
-        if improvement_type == "skill" or improvement_type is None:
-            targets.extend(ALL_SKILLS)
-        
-        # Filter based on current input
         filtered = [
             target for target in targets 
             if current.lower() in target.lower()

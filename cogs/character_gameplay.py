@@ -15,7 +15,7 @@ from core.character_utils import (
     ensure_h5e_columns, ALL_SKILLS, H5E_SKILLS, HeraldMessages
 )
 from core.ui_utils import (
-    HeraldEmojis, create_health_bar, create_willpower_bar,
+    HeraldEmojis, HeraldMessages, HeraldColors, create_health_bar, create_willpower_bar,
     create_edge_bar, create_desperation_bar
 )
 from config.settings import GUILD_ID
@@ -352,14 +352,14 @@ class CharacterGameplay(commands.Cog):
             
             embed = discord.Embed(
                 title=f"{HeraldEmojis.EDGE} Edge Updated",
-                description=f"**{char['name']}'s Edge:** {current_edge} → {new_edge}\n{edge_dots}",
+                description=f"⚡ Edge: {current_edge} → {new_edge}\n{HeraldMessages.PATTERN_LOGGED}: Hunter's advantage deployed\n{edge_dots}",
                 color=0xFFD700
             )
-            
+
             if new_edge > current_edge:
                 embed.add_field(
-                    name=f"{HeraldEmojis.SUCCESS} Edge Increased!", 
-                    value=f"Your character now adds {new_edge} dice to Danger rolls!", 
+                    name=f"{HeraldMessages.SUCCESS_LOGGED}",
+                    value=f"Your character now adds {new_edge} dice to Danger rolls!",
                     inline=False
                 )
             
@@ -462,21 +462,21 @@ class CharacterGameplay(commands.Cog):
             
             embed = discord.Embed(
                 title=f"{HeraldEmojis.DESPERATION} Desperation Updated",
-                description=f"**{char['name']}'s Desperation:** {current_desperation} → {new_desperation}\n{desperation_bar}",
+                description=f"😰 Desperation activated: {current_desperation} → {new_desperation}\n{HeraldMessages.PATTERN_LOGGED}: Risk increases with reward\n{desperation_bar}",
                 color=0x8B0000 if new_desperation >= 7 else 0xFF4500 if new_desperation >= 4 else 0x4169E1
             )
-            
+
             # Add contextual warnings
             if new_desperation >= 7 and current_desperation < 7:
                 embed.add_field(
-                    name=f"{HeraldEmojis.WARNING} Dangerous Desperation!", 
-                    value="Your Hunter has reached a critical level of Desperation. Failed rolls now trigger Desperation dice!", 
+                    name=f"{HeraldMessages.PATTERN_WARNING}",
+                    value="Your Hunter has reached a critical level of Desperation. Failed rolls now trigger Desperation dice!",
                     inline=False
                 )
             elif new_desperation == 10:
                 embed.add_field(
-                    name=f"{HeraldEmojis.CRITICAL} Maximum Desperation!", 
-                    value="Your Hunter is at the breaking point. One more failed roll could mean disaster!", 
+                    name=f"{HeraldMessages.PATTERN_WARNING}: Critical threshold",
+                    value="Your Hunter is at the breaking point. One more failed roll could mean disaster!",
                     inline=False
                 )
             

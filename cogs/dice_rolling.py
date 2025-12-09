@@ -17,7 +17,7 @@ from core.dice_utils import (
 from core.character_utils import (
     find_character, character_autocomplete, get_character_attribute, get_character_skill, ALL_SKILLS
 )
-from core.ui_utils import HeraldEmojis, HeraldMessages
+from core.ui_utils import HeraldEmojis, HeraldMessages, HeraldColors
 from core.db import get_async_db
 from config.settings import GUILD_ID
 
@@ -73,15 +73,22 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
     # === STEP 8: Margin if difficulty was set ===
     if difficulty > 0:
         embed.add_field(name="", value=margin_text, inline=False)
-    
-    # === STEP 9: Desperation warning ===
+
+    # === STEP 9: Critical warnings with Herald's voice ===
     if result.messy_critical:
         embed.add_field(
             name="",
-            value=f"💀 **Messy Critical!** Desperation dice contributed to success.",
+            value=f"💀 **Messy Critical!** Desperation dice contributed to success.\n{HeraldMessages.PATTERN_WARNING}: Desperation leaves traces",
             inline=False
         )
-    
+    elif result.crits > 0:
+        # Regular critical pair
+        embed.add_field(
+            name="",
+            value=f"{HeraldMessages.PATTERN_RECOGNIZED}: Exceptional execution",
+            inline=False
+        )
+
     return embed
 
 

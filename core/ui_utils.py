@@ -300,11 +300,48 @@ async def with_loading_indicator(interaction, operation_func, loading_message: s
         raise
 
 
+# ===== COLOR SYSTEM =====
+
+class HeraldColors:
+    """Herald's signature color palette - Orange diamond theme"""
+
+    # Core brand colors
+    ORANGE = 0xFF8C00          # Signature orange (#FF8C00)
+    DARK_ORANGE = 0xCC7000     # Darker shade for contrast
+    BLOOD_RED = 0x8B0000       # Dark red for serious warnings
+
+    # Semantic colors (using orange theme)
+    SUCCESS = 0xFF8C00         # Orange for successful operations
+    WARNING = 0xFFD700         # Gold for warnings
+    ERROR = 0x8B0000           # Blood red for errors
+    INFO = 0xFF8C00            # Orange for information
+
+    # Keep existing dice colors for compatibility
+    CRITICAL = 0x00FF00              # Green - Critical success
+    MESSY_CRITICAL = 0xEA3323        # Red-orange - Messy critical
+    DICE_SUCCESS = 0x7777FF          # Blue - Standard success
+    DICE_FAILURE = 0x808080          # Gray - Failure
+
+
 # ===== MESSAGE SYSTEM =====
 
 class HeraldMessages:
-    """Centralized user-friendly messages with actionable suggestions"""
-    
+    """Herald's analytical voice - short declarative statements, present tense"""
+
+    # State change markers (🔸 usage)
+    QUERY_RECOGNIZED = "🔸 Query recognized"
+    PROTOCOL_ESTABLISHED = "🔸 Protocol established"
+    PATTERN_LOGGED = "🔸 Pattern logged"
+    SUCCESS_LOGGED = "🔸 Logged"
+    QUERY_FAILED = "🔸 Query failed"
+    INCOMPLETE_DATA = "🔸 Incomplete data stream"
+    PATTERN_WARNING = "🔸 Pattern warning"
+    PATTERN_RECOGNIZED = "🔸 Pattern recognized"
+
+    # Herald's catchphrase
+    CATCHPHRASE = "🔸 What are we Hunting?"
+
+    # Legacy methods for backward compatibility
     @staticmethod
     def xp_insufficient(needed: int, available: int, improvement: str) -> str:
         """Enhanced XP insufficient message"""
@@ -314,7 +351,7 @@ class HeraldMessages:
             f"💰 You have **{available} XP** available.\n"
             f"💡 You need **{shortfall} more XP**. Use `/xp action:add amount:{shortfall}` to add more."
         )
-    
+
     @staticmethod
     def skill_at_maximum(skill_name: str, current_dots: int) -> str:
         """Enhanced skill maximum message"""
@@ -322,12 +359,12 @@ class HeraldMessages:
             f"{HeraldEmojis.WARNING} **{skill_name}** is already at maximum ({current_dots} dots).\n"
             f"💡 Consider adding specialties with `/specialty action:add skill:{skill_name} specialty:\"Your Focus\"`"
         )
-    
+
     @staticmethod
     def operation_success(title: str, description: str) -> str:
         """Standardized success message"""
         return f"{HeraldEmojis.SUCCESS} **{title}**\n{description}"
-    
+
     @staticmethod
     def operation_failed(title: str, error: str, suggestion: str = None) -> str:
         """Standardized error message"""

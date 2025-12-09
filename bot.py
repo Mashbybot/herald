@@ -112,14 +112,37 @@ class HeraldBot(commands.Bot):
         self.logger.info(f"🆔 Bot ID: {self.user.id}")
         self.logger.info(f"🏰 Guilds: {len(self.guilds)}")
         self.logger.info(f"👥 Users: {len(set(self.get_all_members()))}")
-        
-        # Set bot status
-        activity = discord.Activity(
-            type=discord.ActivityType.playing,
-            name="Hunter: The Reckoning 5E | /help"
-        )
-        await self.change_presence(activity=activity)
-        self.logger.info("🎯 Bot status set and ready for commands")
+
+        # Start rotating presence messages
+        self.loop.create_task(self.rotate_presence())
+        self.logger.info("🎯 Bot status rotation started")
+
+    async def rotate_presence(self):
+        """Rotate presence messages every 5 minutes with Herald's voice"""
+        presence_messages = [
+            "🔸 Tracking patterns",
+            "🔸 Protocol established",
+            "🔸 What are we Hunting?",
+            "🔸 /help | Herald the Reckoning"
+        ]
+
+        index = 0
+        await self.wait_until_ready()
+
+        while not self.is_closed():
+            try:
+                activity = discord.Activity(
+                    type=discord.ActivityType.playing,
+                    name=presence_messages[index]
+                )
+                await self.change_presence(activity=activity)
+
+                index = (index + 1) % len(presence_messages)
+                await asyncio.sleep(300)  # 5 minutes
+
+            except Exception as e:
+                self.logger.error(f"Error rotating presence: {e}")
+                await asyncio.sleep(60)  # Wait 1 minute on error before retrying
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: Exception):
         """Global error handler for slash commands"""
