@@ -24,16 +24,16 @@ class HeraldEmojis:
     NEW = "✨"
     
     # Health & Damage (Emoji diamonds - large and prominent)
-    HEALTH_FULL = "🔶"          # Large Orange Diamond (filled/healthy)
-    HEALTH_SUPERFICIAL = "🔸"   # Small Orange Diamond (superficial damage)
-    HEALTH_AGGRAVATED = "🔴"    # Red Circle (aggravated damage)
-    HEALTH_EMPTY = "⬜"         # White Square (no capacity)
+    HEALTH_FULL = "🔶"          # Large Orange Diamond (undamaged/healthy)
+    HEALTH_SUPERFICIAL = "🟨"   # Yellow Square (superficial damage)
+    HEALTH_AGGRAVATED = "🔻"    # Red Triangle Pointed Down (aggravated damage)
+    HEALTH_EMPTY = "🔸"         # Small Orange Diamond (no capacity)
 
     # Willpower (Emoji diamonds - large and prominent)
-    WILLPOWER_FULL = "🔷"       # Large Blue Diamond (filled/undamaged)
-    WILLPOWER_SUPERFICIAL = "🔹" # Small Blue Diamond (superficial damage)
-    WILLPOWER_AGGRAVATED = "🔵"  # Blue Circle (aggravated damage)
-    WILLPOWER_EMPTY = "⬜"      # White Square (no capacity)
+    WILLPOWER_FULL = "🔷"       # Large Blue Diamond (undamaged)
+    WILLPOWER_SUPERFICIAL = "🟨" # Yellow Square (superficial damage)
+    WILLPOWER_AGGRAVATED = "🔻"  # Red Triangle Pointed Down (aggravated damage)
+    WILLPOWER_EMPTY = "🔹"      # Small Blue Diamond (no capacity)
     
     # H5E Mechanics
     EDGE = "⚡"
