@@ -26,12 +26,12 @@ class HeraldEmojis:
     # Health & Damage (Emoji diamonds - large and prominent)
     HEALTH_FULL = "🔶"          # Large Orange Diamond (undamaged/healthy)
     HEALTH_SUPERFICIAL = "🔽"   # Downwards Button (superficial damage)
-    HEALTH_AGGRAVATED = "⏬"     # Fast Down Button (aggravated damage)
+    HEALTH_AGGRAVATED = "🔻"    # Red Triangle Pointed Down (aggravated damage)
     HEALTH_EMPTY = "🔸"         # Small Orange Diamond (no capacity)
 
     # Willpower (Emoji diamonds - large and prominent)
     WILLPOWER_FULL = "🔷"       # Large Blue Diamond (undamaged)
-    WILLPOWER_SUPERFICIAL = "🔼" # Upwards Button / Triangle with Rounded Corners (superficial damage)
+    WILLPOWER_SUPERFICIAL = "🔼" # Triangle with Rounded Corners (superficial damage)
     WILLPOWER_AGGRAVATED = "🔻"  # Red Triangle Pointed Down (aggravated damage)
     WILLPOWER_EMPTY = "🔹"      # Small Blue Diamond (no capacity)
     
