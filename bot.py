@@ -116,13 +116,14 @@ class HeraldBot(commands.Bot):
         self.logger.info(f"🏰 Guilds: {len(self.guilds)}")
         self.logger.info(f"👥 Users: {len(set(self.get_all_members()))}")
 
-<<<<<<< HEAD
-        # Start rotating presence messages
+        # Start rotating presence messages (respects maintenance mode)
         self.loop.create_task(self.rotate_presence())
         self.logger.info("🎯 Bot status rotation started")
 
     async def rotate_presence(self):
         """Rotate presence messages every 5 minutes with Herald's voice"""
+        from config.settings import MAINTENANCE_MODE
+
         presence_messages = [
             "🔸 Tracking patterns",
             "🔸 Protocol established",
@@ -135,35 +136,29 @@ class HeraldBot(commands.Bot):
 
         while not self.is_closed():
             try:
-                activity = discord.Activity(
-                    type=discord.ActivityType.playing,
-                    name=presence_messages[index]
-                )
+                # Check maintenance mode on each iteration
+                if MAINTENANCE_MODE:
+                    activity = discord.Activity(
+                        type=discord.ActivityType.watching,
+                        name="🚧 Maintenance Mode"
+                    )
+                else:
+                    activity = discord.Activity(
+                        type=discord.ActivityType.playing,
+                        name=presence_messages[index]
+                    )
+
                 await self.change_presence(activity=activity)
 
-                index = (index + 1) % len(presence_messages)
+                # Only rotate index in normal mode
+                if not MAINTENANCE_MODE:
+                    index = (index + 1) % len(presence_messages)
+
                 await asyncio.sleep(300)  # 5 minutes
 
             except Exception as e:
                 self.logger.error(f"Error rotating presence: {e}")
                 await asyncio.sleep(60)  # Wait 1 minute on error before retrying
-=======
-        # Set bot status based on maintenance mode
-        if MAINTENANCE_MODE:
-            activity = discord.Activity(
-                type=discord.ActivityType.watching,
-                name="🚧 Maintenance Mode"
-            )
-            self.logger.warning("⚠️ Bot is in MAINTENANCE MODE")
-        else:
-            activity = discord.Activity(
-                type=discord.ActivityType.playing,
-                name="Hunter: The Reckoning 5E | /help"
-            )
-
-        await self.change_presence(activity=activity)
-        self.logger.info("🎯 Bot status set and ready for commands")
->>>>>>> origin/claude/review-herald-improvements-015VY7XropkviKLnaEKAwPDw
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """Global check for all interactions - handle maintenance mode"""
