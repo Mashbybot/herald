@@ -389,12 +389,12 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         willpower_remaining = max(0, willpower_current - willpower_sup - willpower_agg)
         
         embed.add_field(
-            name=f"{HeraldEmojis.HEALTH_FULL} Health",
+            name="Health",
             value=f"{health_bar}\n`{health_remaining}/{health_current} remaining`",
             inline=True
         )
         embed.add_field(
-            name=f"{HeraldEmojis.WILLPOWER_FULL} Willpower",
+            name="Willpower",
             value=f"{willpower_bar}\n`{willpower_remaining}/{willpower_current} remaining`",
             inline=True
         )
@@ -407,19 +407,19 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         desperation_display = create_desperation_bar(desperation)
         
         embed.add_field(
-            name=f"{HeraldEmojis.EDGE} Edge",
+            name="Edge",
             value=f"{edge_display}\n`{edge}/5`",
             inline=True
         )
         embed.add_field(
-            name=f"{HeraldEmojis.DESPERATION} Desperation",
+            name="Desperation",
             value=f"{desperation_display}\n`{desperation}/10`",
             inline=True
         )
         
         # Add creed in remaining space
         embed.add_field(
-            name=f"{HeraldEmojis.CREED} Creed",
+            name="Creed",
             value=creed,
             inline=True
         )
@@ -447,17 +447,17 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         ]
         
         embed.add_field(
-            name=f"{HeraldEmojis.PHYSICAL} Physical",
+            name="Physical",
             value="\n".join(physical_attrs),
             inline=True
         )
         embed.add_field(
-            name=f"{HeraldEmojis.SOCIAL} Social",
+            name="Social",
             value="\n".join(social_attrs),
             inline=True
         )
         embed.add_field(
-            name=f"{HeraldEmojis.MENTAL} Mental",
+            name="Mental",
             value="\n".join(mental_attrs),
             inline=True
         )
@@ -500,7 +500,7 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         
         if h5e_mechanics:
             embed.add_field(
-                name="🎭 Hunter Traits",
+                name="Hunter Mechanics",
                 value="\n\n".join(h5e_mechanics),
                 inline=False
             )
