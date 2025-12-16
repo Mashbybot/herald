@@ -39,12 +39,58 @@ MAINTENANCE_MODE = os.getenv("MAINTENANCE_MODE", "false").lower() == "true"
 BETA_FEATURES = os.getenv("BETA_FEATURES", "false").lower() == "true"
 
 # Validate critical settings
-if ENVIRONMENT == "production":
-    if not DATABASE_URL:
-        raise ValueError("DATABASE_URL is required for production environment")
-    if GUILD_ID:
-        raise ValueError("GUILD_ID should not be set in production (use global slash commands)")
-    
+def validate_config():
+    """Validate configuration settings and raise errors for invalid configs"""
+    import os
+    from pathlib import Path
+
+    # Check Discord token format (basic validation)
+    if DISCORD_TOKEN and len(DISCORD_TOKEN) < 50:
+        raise ValueError("DISCORD_TOKEN appears to be invalid (too short)")
+
+    # Production-specific validations
+    if ENVIRONMENT == "production":
+        if not DATABASE_URL:
+            raise ValueError("DATABASE_URL is required for production environment")
+        if GUILD_ID:
+            raise ValueError("GUILD_ID should not be set in production (use global slash commands)")
+
+    # Development-specific validations
+    elif ENVIRONMENT == "development":
+        if not USE_POSTGRESQL and not DATABASE_PATH:
+            raise ValueError("DATABASE_PATH is required for SQLite in development mode")
+
+        # Ensure database directory exists for SQLite
+        if not USE_POSTGRESQL:
+            db_path = Path(DATABASE_PATH)
+            db_dir = db_path.parent
+            if not db_dir.exists():
+                try:
+                    db_dir.mkdir(parents=True, exist_ok=True)
+                except Exception as e:
+                    raise ValueError(f"Cannot create database directory {db_dir}: {e}")
+
+    # Validate numeric settings
+    if OWNER_ID is not None and OWNER_ID <= 0:
+        raise ValueError("OWNER_ID must be a positive integer (Discord user ID)")
+
+    if GUILD_ID is not None and GUILD_ID <= 0:
+        raise ValueError("GUILD_ID must be a positive integer (Discord server ID)")
+
+    if MAX_GUILDS < 0:
+        raise ValueError("MAX_GUILDS cannot be negative")
+
+    return True
+
+
+# Run validation
+try:
+    validate_config()
+except ValueError as e:
+    print(f"❌ Configuration Error: {e}")
+    print(f"💡 Check your .env file and environment variables")
+    raise
+
 print(f"🔧 Herald configured for {ENVIRONMENT} environment")
 print(f"🗄️ Database: {'PostgreSQL' if USE_POSTGRESQL else 'SQLite'}")
 print(f"⚙️ Command scope: {'Guild-specific' if GUILD_ID else 'Global'}")

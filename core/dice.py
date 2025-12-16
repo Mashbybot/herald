@@ -82,22 +82,25 @@ def _roll_edge_dice(count: int) -> List[int]:
     """
     Roll edge dice with exploding 10s
     Edge dice explode: when you roll a 10, roll another die
+
+    Uses explosion depth tracking instead of total dice count to prevent
+    runaway explosions while still allowing legitimate lucky streaks.
     """
+    from core.constants import MAX_EDGE_EXPLOSION_DEPTH
+
     dice = []
     remaining = count
-    
-    while remaining > 0:
+    explosion_depth = 0
+
+    while remaining > 0 and explosion_depth < MAX_EDGE_EXPLOSION_DEPTH:
         new_dice = [random.randint(1, 10) for _ in range(remaining)]
         dice.extend(new_dice)
-        
+
         # Count 10s for explosion
         tens = sum(1 for die in new_dice if die == 10)
         remaining = tens
-        
-        # Safety check to prevent infinite loops
-        if len(dice) > count * 10:  # Arbitrary large limit
-            break
-    
+        explosion_depth += 1
+
     return dice
 
 def roll_rouse_check() -> Dict[str, Any]:
@@ -132,15 +135,4 @@ def simple_roll(pool_size: int) -> Dict[str, Any]:
         "successes": successes + crits,
         "crits": crits,
         "total_successes": successes + crits
-    }
-
-# Legacy function for backward compatibility
-def roll_pool_legacy(attribute: int, skill: int, desperation: bool = False):
-    """Backward compatible version of the original function"""
-    result = roll_pool(attribute, skill, desperation)
-    return {
-        "dice": result.all_dice,
-        "successes": result.total_successes,
-        "crits": result.crits,
-        "desperation": desperation
     }

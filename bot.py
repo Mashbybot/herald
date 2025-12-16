@@ -70,8 +70,9 @@ class HeraldBot(commands.Bot):
         
         # Load all cogs
         cogs_to_load = [
+            'cogs.system',
             'cogs.character_management',
-            'cogs.character_gameplay', 
+            'cogs.character_gameplay',
             'cogs.character_progression',
             'cogs.character_inventory',
             'cogs.dice_rolling',
@@ -108,11 +109,14 @@ class HeraldBot(commands.Bot):
 
     async def on_ready(self):
         """Called when the bot has successfully connected to Discord"""
+        from config.settings import MAINTENANCE_MODE
+
         self.logger.info(f"🏹 {self.user} has connected to Discord!")
         self.logger.info(f"🆔 Bot ID: {self.user.id}")
         self.logger.info(f"🏰 Guilds: {len(self.guilds)}")
         self.logger.info(f"👥 Users: {len(set(self.get_all_members()))}")
 
+<<<<<<< HEAD
         # Start rotating presence messages
         self.loop.create_task(self.rotate_presence())
         self.logger.info("🎯 Bot status rotation started")
@@ -143,6 +147,39 @@ class HeraldBot(commands.Bot):
             except Exception as e:
                 self.logger.error(f"Error rotating presence: {e}")
                 await asyncio.sleep(60)  # Wait 1 minute on error before retrying
+=======
+        # Set bot status based on maintenance mode
+        if MAINTENANCE_MODE:
+            activity = discord.Activity(
+                type=discord.ActivityType.watching,
+                name="🚧 Maintenance Mode"
+            )
+            self.logger.warning("⚠️ Bot is in MAINTENANCE MODE")
+        else:
+            activity = discord.Activity(
+                type=discord.ActivityType.playing,
+                name="Hunter: The Reckoning 5E | /help"
+            )
+
+        await self.change_presence(activity=activity)
+        self.logger.info("🎯 Bot status set and ready for commands")
+>>>>>>> origin/claude/review-herald-improvements-015VY7XropkviKLnaEKAwPDw
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Global check for all interactions - handle maintenance mode"""
+        from config.settings import MAINTENANCE_MODE, OWNER_ID
+
+        # Allow owner to bypass maintenance mode
+        if MAINTENANCE_MODE and (OWNER_ID is None or interaction.user.id != OWNER_ID):
+            await interaction.response.send_message(
+                "🚧 **Maintenance Mode**\n\n"
+                "Herald is currently undergoing maintenance. Please check back soon!\n\n"
+                "For updates, visit our support server.",
+                ephemeral=True
+            )
+            return False
+
+        return True
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: Exception):
         """Global error handler for slash commands"""
@@ -175,6 +212,14 @@ class HeraldBot(commands.Bot):
     async def close(self):
         """Clean shutdown"""
         self.logger.info("🔄 Shutting down Herald bot...")
+
+        # Close database connections
+        from core.db import close_database
+        try:
+            await close_database()
+        except Exception as e:
+            self.logger.error(f"❌ Error closing database: {e}")
+
         await super().close()
 
 

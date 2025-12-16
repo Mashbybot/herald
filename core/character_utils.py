@@ -23,11 +23,13 @@ class DatabaseError(Exception):
 
 class CharacterCache:
     """Simple LRU-style cache for character data"""
-    
-    def __init__(self, max_size: int = 100, ttl_seconds: int = 300):
+
+    def __init__(self, max_size: int = None, ttl_seconds: int = None):
+        from core.constants import CACHE_MAX_SIZE, CACHE_TTL_SECONDS
+
         self.cache: Dict[str, Tuple[Any, float]] = {}
-        self.max_size = max_size
-        self.ttl = ttl_seconds
+        self.max_size = max_size or CACHE_MAX_SIZE
+        self.ttl = ttl_seconds or CACHE_TTL_SECONDS
     
     def get(self, key: str) -> Optional[Any]:
         """Get cached value if valid"""
@@ -164,31 +166,37 @@ async def get_character_and_skills(user_id: str, character_name: str) -> Tuple[O
 
 async def get_character_attribute(user_id: str, character_name: str, attribute: str) -> Optional[int]:
     """Get character attribute with caching and validation."""
-    if attribute.lower() not in ['strength', 'dexterity', 'stamina', 'charisma', 'manipulation', 'composure', 'intelligence', 'wits', 'resolve']:
+    from core.constants import VALID_ATTRIBUTES
+
+    attribute_lower = attribute.lower()
+    if attribute_lower not in VALID_ATTRIBUTES:
         logger.warning(f"Invalid attribute requested: {attribute}")
         return None
-    
-    cache_key = f"attr:{user_id}:{character_name.lower()}:{attribute.lower()}"
+
+    cache_key = f"attr:{user_id}:{character_name.lower()}:{attribute_lower}"
     cached_value = _character_cache.get(cache_key)
-    
+
     if cached_value is not None:
         return cached_value
-    
+
+    # Build safe SQL query using whitelist - attribute is validated above
+    # We use a dict to map validated attributes to SQL columns
     try:
         from core.db import get_async_db
         async with get_async_db() as conn:
+            # Fetch entire character row to avoid SQL injection risk
             result = await conn.fetchrow(
-                f"SELECT {attribute.lower()} FROM characters WHERE user_id = $1 AND name = $2", 
+                "SELECT strength, dexterity, stamina, charisma, manipulation, composure, intelligence, wits, resolve FROM characters WHERE user_id = $1 AND name = $2",
                 user_id, character_name
             )
-            
+
             if result:
-                value = result[attribute.lower()]
+                value = result[attribute_lower]
                 _character_cache.set(cache_key, value)
                 return value
-            
+
             return None
-            
+
     except Exception as e:
         logger.error(f"Error getting attribute {attribute} for character '{character_name}' (user {user_id}): {e}")
         raise DatabaseError(f"Failed to get character attribute: {e}")
