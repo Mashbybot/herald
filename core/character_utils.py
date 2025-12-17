@@ -445,24 +445,22 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
 
         # Display trackers in 2x2 layout
         embed.add_field(
-            name="Health",
+            name="__Health__",
             value=f"{health_bar}\n`{health_remaining}/{health_current}`",
             inline=True
         )
         embed.add_field(
-            name="Willpower",
+            name="__Willpower__",
             value=f"{willpower_bar}\n`{willpower_remaining}/{willpower_current}`",
             inline=True
         )
-        # Add spacer to force Desperation and Danger to next row
-        embed.add_field(name="\u200b", value="\u200b", inline=True)
         embed.add_field(
-            name="Desperation",
+            name="__Desperation__",
             value=f"{desperation_bar}\n`{desperation}/10`",
             inline=True
         )
         embed.add_field(
-            name="Danger",
+            name="__Danger__",
             value=f"{danger_bar}\n`{danger}/10`",
             inline=True
         )
@@ -504,17 +502,17 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         ]
         
         embed.add_field(
-            name="Physical",
+            name="__Physical__",
             value="\n".join(physical_attrs),
             inline=True
         )
         embed.add_field(
-            name="Social",
+            name="__Social__",
             value="\n".join(social_attrs),
             inline=True
         )
         embed.add_field(
-            name="Mental",
+            name="__Mental__",
             value="\n".join(mental_attrs),
             inline=True
         )
@@ -537,7 +535,7 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
                     skills_display += f"\n*...and {len(trained_skills) - 15} more*"
                 
                 embed.add_field(
-                    name="Trained Skills",
+                    name="__Trained Skills__",
                     value=skills_display,
                     inline=False
                 )
@@ -582,11 +580,7 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
             h5e_mechanics.append(f"**Ambition:** {character['ambition']}")
         if character.get('desire'):
             h5e_mechanics.append(f"**Desire:** {character['desire']}")
-        if character.get('drive'):
-            drive_text = f"**Drive:** {character['drive']}"
-            if character.get('redemption') and not in_despair:
-                drive_text += f"\n{HeraldEmojis.REDEMPTION} *Redemption:* {character['redemption']}"
-            h5e_mechanics.append(drive_text)
+        # Note: Drive is already shown at the top of the sheet, so we don't repeat it here
 
         if h5e_mechanics:
             embed.add_field(
