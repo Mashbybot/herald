@@ -120,9 +120,9 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
 
 def create_inconnu_dice_display(result: DiceResult) -> str:
     """Create visual dice emoji display in Inconnu style with sorted dice"""
-    
-    # Regular dice (combine base + edge, sort successes first)
-    regular_dice = result.dice + result.edge_dice
+
+    # Regular dice (sort successes first)
+    regular_dice = result.dice
     sorted_regular = sort_dice_for_display(regular_dice)
     regular_display = format_dice_display(sorted_regular, "regular")
     
@@ -153,7 +153,6 @@ class DiceRolling(commands.Cog):
         attribute="Attribute rating (0-5)",
         skill="Skill rating (0-5)",
         difficulty="Target number of successes needed",
-        edge="Number of edge dice to add",
         desperation="Desperation rating (0-10) - adds this many desperation dice",
         modifier="Additional dice pool modifier"
     )
@@ -174,7 +173,6 @@ class DiceRolling(commands.Cog):
         attribute: int = 0,
         skill: int = 0,
         difficulty: int = 0,
-        edge: int = 0,
         desperation: int = 0,
         modifier: int = 0
     ):
@@ -195,13 +193,6 @@ class DiceRolling(commands.Cog):
             )
             return
 
-        if edge < 0 or edge > 10:
-            await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Edge must be 0-10",
-                ephemeral=True
-            )
-            return
-
         if desperation < 0 or desperation > 10:
             await interaction.response.send_message(
                 f"{HeraldEmojis.ERROR} Desperation must be 0-10",
@@ -211,8 +202,8 @@ class DiceRolling(commands.Cog):
 
         try:
             # Roll the dice
-            result = roll_pool(attribute, skill, desperation, edge, 0)
-            
+            result = roll_pool(attribute, skill, desperation, 0)
+
             # Create description
             pool_parts = []
             if attribute > 0:
@@ -221,8 +212,6 @@ class DiceRolling(commands.Cog):
                 pool_parts.append(f"Skill {skill}")
             if modifier != 0:
                 pool_parts.append(f"Modifier {modifier:+d}")
-            if edge > 0:
-                pool_parts.append(f"Edge {edge}")
             if desperation > 0:
                 pool_parts.append(f"Desperation {desperation}")
 
@@ -251,7 +240,6 @@ class DiceRolling(commands.Cog):
         attribute="Attribute to use",
         skill="Skill to use",
         difficulty="Target number of successes needed",
-        edge="Override character's edge rating",
         use_desperation="Use Desperation dice (aligned with Drive)",
         modifier="Additional dice pool modifier"
     )
@@ -275,7 +263,6 @@ class DiceRolling(commands.Cog):
         attribute: str,
         skill: str = None,
         difficulty: int = 0,
-        edge: int = None,
         use_desperation: bool = False,
         modifier: int = 0
     ):
@@ -303,10 +290,6 @@ class DiceRolling(commands.Cog):
                 skill_value = await get_character_skill(user_id, char['name'], skill)
                 if skill_value is None:
                     skill_value = 0
-
-            # Use character's edge if not overridden
-            if edge is None:
-                edge = char.get('edge', 0) or 0
 
             # Use character's danger rating automatically
             char_danger = char.get('danger', 0) or 0
@@ -336,17 +319,9 @@ class DiceRolling(commands.Cog):
                         ephemeral=True
                     )
                     return
-            
-            # Validate edge override
-            if edge < 0 or edge > 10:
-                await interaction.response.send_message(
-                    f"{HeraldEmojis.ERROR} Edge must be 0-10",
-                    ephemeral=True
-                )
-                return
 
             # Roll the dice
-            result = roll_pool(attr_value, skill_value, desperation_dice, edge, 0)
+            result = roll_pool(attr_value, skill_value, desperation_dice, 0)
 
             # Create description
             pool_parts = []
@@ -356,8 +331,6 @@ class DiceRolling(commands.Cog):
                 pool_parts.append(f"{skill} {skill_value}")
             if modifier != 0:
                 pool_parts.append(f"Modifier {modifier:+d}")
-            if edge > 0:
-                pool_parts.append(f"Edge {edge}")
             if desperation_dice > 0:
                 pool_parts.append(f"Desperation {desperation_dice}")
             

@@ -3,14 +3,12 @@ from typing import Dict, List, Any
 
 class DiceResult:
     """Container for dice roll results with H5E-specific data"""
-    def __init__(self, dice: List[int], edge_dice: List[int] = None,
-                 desperation_dice: List[int] = None):
+    def __init__(self, dice: List[int], desperation_dice: List[int] = None):
         self.dice = dice
-        self.edge_dice = edge_dice or []
         self.desperation_dice = desperation_dice or []
 
         # Calculate results
-        self.all_dice = self.dice + self.edge_dice + self.desperation_dice
+        self.all_dice = self.dice + self.desperation_dice
         self.successes = self._count_successes()
         self.crits = self._count_crits()
         self.total_successes = self.successes + self.crits
@@ -44,7 +42,6 @@ class DiceResult:
         """Convert to dictionary for easy serialization"""
         return {
             "dice": self.dice,
-            "edge_dice": self.edge_dice,
             "desperation_dice": self.desperation_dice,
             "all_dice": self.all_dice,
             "successes": self.successes,
@@ -56,7 +53,7 @@ class DiceResult:
         }
 
 def roll_pool(attribute: int, skill: int, desperation: int = 0,
-              edge: int = 0, difficulty: int = 0) -> DiceResult:
+              difficulty: int = 0) -> DiceResult:
     """
     Roll a dice pool for Hunter: The Reckoning 5th Edition
 
@@ -64,7 +61,6 @@ def roll_pool(attribute: int, skill: int, desperation: int = 0,
         attribute: Attribute rating (0-5 typically)
         skill: Skill rating (0-5 typically)
         desperation: Desperation rating (0-10) - adds this many desperation dice
-        edge: Number of edge dice to add
         difficulty: Difficulty modifier (negative = easier, positive = harder)
 
     Returns:
@@ -76,42 +72,12 @@ def roll_pool(attribute: int, skill: int, desperation: int = 0,
     # Roll base dice
     base_dice = [random.randint(1, 10) for _ in range(base_pool)]
 
-    # Roll edge dice (can explode on 10s)
-    edge_dice = []
-    if edge > 0:
-        edge_dice = _roll_edge_dice(edge)
-
     # Roll desperation dice if applicable (add Desperation rating to pool)
     desperation_dice = []
     if desperation > 0:
         desperation_dice = [random.randint(1, 10) for _ in range(desperation)]
 
-    return DiceResult(base_dice, edge_dice, desperation_dice)
-
-def _roll_edge_dice(count: int) -> List[int]:
-    """
-    Roll edge dice with exploding 10s
-    Edge dice explode: when you roll a 10, roll another die
-
-    Uses explosion depth tracking instead of total dice count to prevent
-    runaway explosions while still allowing legitimate lucky streaks.
-    """
-    from core.constants import MAX_EDGE_EXPLOSION_DEPTH
-
-    dice = []
-    remaining = count
-    explosion_depth = 0
-
-    while remaining > 0 and explosion_depth < MAX_EDGE_EXPLOSION_DEPTH:
-        new_dice = [random.randint(1, 10) for _ in range(remaining)]
-        dice.extend(new_dice)
-
-        # Count 10s for explosion
-        tens = sum(1 for die in new_dice if die == 10)
-        remaining = tens
-        explosion_depth += 1
-
-    return dice
+    return DiceResult(base_dice, desperation_dice)
 
 def roll_rouse_check() -> Dict[str, Any]:
     """

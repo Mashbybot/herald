@@ -274,103 +274,13 @@ class CharacterGameplay(commands.Cog):
         except Exception as e:
             logger.error(f"Error healing damage: {e}")
             await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Error healing damage: {str(e)}", 
+                f"{HeraldEmojis.ERROR} Error healing damage: {str(e)}",
                 ephemeral=True
             )
 
-    @app_commands.command(name="edge", description="View or modify your character's Edge rating")
-    @app_commands.describe(
-        character="Character name",
-        action="What to do with Edge",
-        amount="Amount to add/subtract/set (optional for 'view')"
-    )
-    @app_commands.choices(action=[
-        app_commands.Choice(name="View", value="view"),
-        app_commands.Choice(name="Set", value="set"),
-        app_commands.Choice(name="Add", value="add"),
-        app_commands.Choice(name="Subtract", value="subtract")
-    ])
-    async def edge(self, interaction: discord.Interaction, character: str, action: str, amount: int = None):
-        """Manage character Edge ratings (0-5)"""
-        
-        user_id = str(interaction.user.id)
-        
-        try:
-            char = await find_character(user_id, character)
-            if not char:
-                error_msg = await HeraldMessages.character_not_found(user_id, character)
-                await interaction.response.send_message(error_msg, ephemeral=True)
-                return
-            
-            current_edge = safe_get_character_field(char, 'edge', 0)
-            
-            # Handle different actions
-            if action == "view":
-                # Create edge display
-                edge_dots = HeraldEmojis.EDGE * current_edge + HeraldEmojis.EDGE_EMPTY * (5 - current_edge)
-                
-                embed = discord.Embed(
-                    title=f"{HeraldEmojis.EDGE} {char['name']}'s Edge",
-                    description=f"**Current Rating:** {current_edge}/5\n{edge_dots}",
-                    color=0xFFD700
-                )
-                
-                embed.add_field(
-                    name="What is Edge?",
-                    value="Edge represents your Hunter's effectiveness in dangerous situations. Add Edge dice to Danger rolls.",
-                    inline=False
-                )
-                
-                await interaction.response.send_message(embed=embed)
-                return
-            
-            # For set/add/subtract, amount is required
-            if amount is None:
-                await interaction.response.send_message(
-                    f"{HeraldEmojis.ERROR} Please specify an amount for {action}", 
-                    ephemeral=True
-                )
-                return
-            
-            # Calculate new edge value
-            if action == "set":
-                new_edge = max(0, min(amount, 5))
-            elif action == "add":
-                new_edge = max(0, min(current_edge + amount, 5))
-            else:  # subtract
-                new_edge = max(0, current_edge - amount)
-            
-            # Update database with async
-            async with get_async_db() as conn:
-                await conn.execute(
-                    "UPDATE characters SET edge = $1 WHERE user_id = $2 AND name = $3",
-                    new_edge, user_id, char['name']
-                )
-            
-            # Create response
-            edge_dots = HeraldEmojis.EDGE * new_edge + HeraldEmojis.EDGE_EMPTY * (5 - new_edge)
-            
-            embed = discord.Embed(
-                title=f"{HeraldEmojis.EDGE} Edge Updated",
-                description=f"⚡ Edge: {current_edge} → {new_edge}\n{HeraldMessages.PATTERN_LOGGED}: Hunter's advantage deployed\n{edge_dots}",
-                color=0xFFD700
-            )
-
-            if new_edge > current_edge:
-                embed.add_field(
-                    name=f"{HeraldMessages.SUCCESS_LOGGED}",
-                    value=f"Your character now adds {new_edge} dice to Danger rolls!",
-                    inline=False
-                )
-            
-            await interaction.response.send_message(embed=embed)
-            
-        except Exception as e:
-            self.logger.error(f"Error in edge command: {e}")
-            await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} An error occurred while managing Edge", 
-                ephemeral=True
-            )
+    # NOTE: The /edge command has been removed. Edge is now a list of abilities (edges table),
+    # not a dice pool modifier. Edge abilities are displayed on the character sheet.
+    # To add Edge abilities, use the edges table directly or create an /add_edge command.
 
     @app_commands.command(name="desperation", description="View or modify your character's Desperation level")
     @app_commands.describe(

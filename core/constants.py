@@ -9,7 +9,6 @@ CACHE_TTL_SECONDS = 300  # 5 minutes
 AUTOCOMPLETE_CACHE_TTL = 60  # 1 minute for autocomplete
 
 # ===== DICE MECHANICS =====
-MAX_EDGE_EXPLOSION_DEPTH = 10  # Maximum times edge dice can explode
 MAX_DICE_POOL = 100  # Safety limit for total dice in a pool
 
 # ===== CHARACTER LIMITS =====
@@ -23,12 +22,11 @@ ATTRIBUTE_MIN = 1
 ATTRIBUTE_MAX = 5
 SKILL_MIN = 0
 SKILL_MAX = 5
-EDGE_MIN = 0
-EDGE_MAX = 5
+# NOTE: Edge is now a list of abilities (edges table), not a numeric rating
 DESPERATION_MIN = 0
 DESPERATION_MAX = 10
 DANGER_MIN = 0
-DANGER_MAX = 5
+DANGER_MAX = 10
 
 # ===== DISCORD EMBED LIMITS =====
 # Official Discord limits
