@@ -404,69 +404,85 @@ class CharacterGameplay(commands.Cog):
         character="Character name",
         creed="Hunter Creed (leave empty to view current)"
     )
+    @app_commands.choices(creed=[
+        app_commands.Choice(name="Entrepreneurial - Building, inventing, repairing", value="Entrepreneurial"),
+        app_commands.Choice(name="Faithful - Direct conflict with the supernatural", value="Faithful"),
+        app_commands.Choice(name="Inquisitive - Gaining information", value="Inquisitive"),
+        app_commands.Choice(name="Martial - Physical conflict", value="Martial"),
+        app_commands.Choice(name="Underground - Stealth and subterfuge", value="Underground")
+    ])
     async def creed(self, interaction: discord.Interaction, character: str, creed: str = None):
         """Manage character Creed (Hunter type/philosophy)"""
-        
+
         user_id = str(interaction.user.id)
-        
-        if creed and len(creed) > 100:
-            await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Creed must be 100 characters or less", 
-                ephemeral=True
-            )
-            return
-        
+
         try:
             char = await find_character(user_id, character)
-            
+
             if not char:
                 error_msg = await HeraldMessages.character_not_found(user_id, character)
                 await interaction.response.send_message(error_msg, ephemeral=True)
                 return
-            
+
             # If no creed provided, show current
             if creed is None:
                 current_creed = char['creed']
-                
+
                 embed = discord.Embed(
                     title=f"{HeraldEmojis.CREED} {char['name']}'s Creed",
                     color=0x8B0000
                 )
-                
+
                 if current_creed:
                     embed.description = f"**Current Creed:** {current_creed}"
+
+                    # Add creed field descriptions
+                    creed_fields = {
+                        "Entrepreneurial": "Building, inventing, repairing",
+                        "Faithful": "Direct conflict with the supernatural",
+                        "Inquisitive": "Gaining information",
+                        "Martial": "Physical conflict",
+                        "Underground": "Stealth and subterfuge"
+                    }
+
+                    if current_creed in creed_fields:
+                        embed.add_field(
+                            name="Creed Field",
+                            value=creed_fields[current_creed],
+                            inline=False
+                        )
                 else:
                     embed.description = "*No Creed set yet*"
                     embed.add_field(
-                        name="Common Hunter Creeds",
-                        value="• **Innocent** - New to the hunt, idealistic\n• **Martyr** - Willing to sacrifice for the cause\n• **Redeemer** - Seeking redemption through hunting\n• **Visionary** - Sees the bigger picture\n• **Wayward** - Lost their way, hunting out of habit",
+                        name="Hunter: The Reckoning 5E Creeds",
+                        value="• **Entrepreneurial** - Building, inventing, repairing\n• **Faithful** - Direct conflict with the supernatural\n• **Inquisitive** - Gaining information\n• **Martial** - Physical conflict\n• **Underground** - Stealth and subterfuge",
                         inline=False
                     )
-                
+
                 await interaction.response.send_message(embed=embed)
                 return
-            
+
             # Set the creed with async
             async with get_async_db() as conn:
                 await conn.execute(
                     "UPDATE characters SET creed = $1 WHERE user_id = $2 AND name = $3",
                     creed, user_id, char['name']
                 )
-            
+
             embed = discord.Embed(
                 title=f"{HeraldEmojis.CREED} Creed Set",
                 description=f"**{char['name']}'s Creed:** {creed}",
                 color=0x8B0000
             )
-            
-            embed.set_footer(text="Your Creed defines your character's philosophy as a Hunter")
-            
+
+            embed.set_footer(text="Use Desperation dice when your action aligns with your Creed Field")
+
             await interaction.response.send_message(embed=embed)
-            
+
         except Exception as e:
             self.logger.error(f"Error setting creed: {e}")
             await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Error setting creed", 
+                f"{HeraldEmojis.ERROR} Error setting creed",
                 ephemeral=True
             )
 
@@ -633,105 +649,99 @@ class CharacterGameplay(commands.Cog):
     @app_commands.command(name="drive", description="View or set your character's Drive and Redemption")
     @app_commands.describe(
         character="Character name",
-        drive="Why you hunt the supernatural (leave empty to view current)",
-        redemption="How your Drive can be redeemed/healed from Despair"
+        drive="Your Drive (why you hunt) - leave empty to view current"
     )
-    async def drive(self, interaction: discord.Interaction, character: str, drive: str = None, redemption: str = None):
+    @app_commands.choices(drive=[
+        app_commands.Choice(name="Curiosity - Uncover new information about your quarry", value="Curiosity"),
+        app_commands.Choice(name="Vengeance - Hurt your quarry", value="Vengeance"),
+        app_commands.Choice(name="Oath - Actively uphold or fulfill your oath", value="Oath"),
+        app_commands.Choice(name="Greed - Acquire resources from enemies", value="Greed"),
+        app_commands.Choice(name="Pride - Best your quarry in some contest", value="Pride"),
+        app_commands.Choice(name="Envy - Ally with your quarry", value="Envy"),
+        app_commands.Choice(name="Atonement - Protect someone from your quarry", value="Atonement")
+    ])
+    async def drive(self, interaction: discord.Interaction, character: str, drive: str = None):
         """Manage character Drive (reason for hunting) and Redemption (healing from Despair)"""
-        
+
         user_id = str(interaction.user.id)
-        
-        if drive and len(drive) > 200:
-            await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Drive must be 200 characters or less", 
-                ephemeral=True
-            )
-            return
-        
-        if redemption and len(redemption) > 200:
-            await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Redemption must be 200 characters or less", 
-                ephemeral=True
-            )
-            return
-        
+
+        # Drive-Redemption mappings from H5E
+        drive_redemptions = {
+            "Curiosity": "Uncover new information about your quarry",
+            "Vengeance": "Hurt your quarry",
+            "Oath": "Actively uphold or fulfill your oath",
+            "Greed": "Acquire resources from enemies",
+            "Pride": "Best your quarry in some contest",
+            "Envy": "Ally with your quarry",
+            "Atonement": "Protect someone from your quarry"
+        }
+
         try:
             char = await find_character(user_id, character)
-            
+
             if not char:
                 error_msg = await HeraldMessages.character_not_found(user_id, character)
                 await interaction.response.send_message(error_msg, ephemeral=True)
                 return
-            
+
             current_drive = char['drive']
             current_redemption = char['redemption']
-            
+
             # If no drive provided, show current drive and redemption
             if drive is None:
                 embed = discord.Embed(
                     title=f"{HeraldEmojis.DRIVE} {char['name']}'s Drive",
                     color=0x8B0000
                 )
-                
+
                 if current_drive:
                     embed.description = f"**Current Drive:** {current_drive}"
                     if current_redemption:
                         embed.add_field(
-                            name=f"{HeraldEmojis.REDEMPTION} Redemption", 
-                            value=current_redemption, 
-                            inline=False
-                        )
-                    else:
-                        embed.add_field(
-                            name="Set Redemption", 
-                            value="Use `/drive character:Name redemption:\"Method to heal from Despair\"` to set your Redemption path.", 
+                            name=f"{HeraldEmojis.REDEMPTION} Redemption",
+                            value=current_redemption,
                             inline=False
                         )
                 else:
                     embed.description = "*No Drive set yet*"
                     embed.add_field(
-                        name="Set Your Drive", 
-                        value="Use `/drive character:Name drive:\"Why you hunt\"` to establish your Hunter's motivation.\n\n**Examples:**\n• Revenge for a loved one\n• Protect the innocent\n• Understand the supernatural\n• Cleanse the world of evil", 
+                        name="Hunter: The Reckoning 5E Drives",
+                        value="• **Curiosity** - Uncover new information\n• **Vengeance** - Hurt your quarry\n• **Oath** - Uphold or fulfill your oath\n• **Greed** - Acquire resources from enemies\n• **Pride** - Best your quarry in contest\n• **Envy** - Ally with your quarry\n• **Atonement** - Protect someone from your quarry",
                         inline=False
                     )
-                
+
                 await interaction.response.send_message(embed=embed)
                 return
-            
-            # Update drive and/or redemption with async
+
+            # Set both drive and its associated redemption
+            redemption = drive_redemptions.get(drive, drive)
+
             async with get_async_db() as conn:
-                if redemption is not None:
-                    await conn.execute(
-                        "UPDATE characters SET drive = $1, redemption = $2 WHERE user_id = $3 AND name = $4",
-                        drive, redemption, user_id, char['name']
-                    )
-                else:
-                    await conn.execute(
-                        "UPDATE characters SET drive = $1 WHERE user_id = $2 AND name = $3",
-                        drive, user_id, char['name']
-                    )
-            
+                await conn.execute(
+                    "UPDATE characters SET drive = $1, redemption = $2 WHERE user_id = $3 AND name = $4",
+                    drive, redemption, user_id, char['name']
+                )
+
             embed = discord.Embed(
                 title=f"{HeraldEmojis.DRIVE} Drive Set",
                 description=f"**{char['name']}'s Drive:** {drive}",
                 color=0x8B0000
             )
-            
-            if redemption:
-                embed.add_field(
-                    name=f"{HeraldEmojis.REDEMPTION} Redemption", 
-                    value=redemption, 
-                    inline=False
-                )
-            
-            embed.set_footer(text="Your Drive defines your character's motivation for hunting")
-            
+
+            embed.add_field(
+                name=f"{HeraldEmojis.REDEMPTION} Redemption",
+                value=redemption,
+                inline=False
+            )
+
+            embed.set_footer(text="Achieve your Redemption to recover from Despair")
+
             await interaction.response.send_message(embed=embed)
-            
+
         except Exception as e:
             self.logger.error(f"Error setting drive: {e}")
             await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Error setting drive", 
+                f"{HeraldEmojis.ERROR} Error setting drive",
                 ephemeral=True
             )
 

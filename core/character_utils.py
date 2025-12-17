@@ -596,7 +596,7 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
             )
         
         # Footer with helpful tips
-        embed.set_footer(text="💡 Use /damage and /heal to manage health • Use /edge and /desperation for H5E mechanics")
+        embed.set_footer(text="💡 Use /damage and /heal to manage health • Use /creed and /drive to set your Hunter's path")
         
         return embed
         
