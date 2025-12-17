@@ -38,8 +38,14 @@ class HeraldEmojis:
     # H5E Mechanics
     EDGE = "⚡"
     EDGE_EMPTY = "🔹"
-    DESPERATION = "😰"
-    DESPERATION_EMPTY = "⬜"
+
+    # Desperation Tracker (10 dots)
+    DESPERATION_FULL = "🟨"      # Yellow Square (filled)
+    DESPERATION_EMPTY = "⬛"     # Black Small Square (empty)
+
+    # Danger Tracker (10 dots)
+    DANGER_FULL = "🟥"           # Red Square (filled)
+    DANGER_EMPTY = "⬛"          # Black Small Square (empty)
     
     # Attributes
     PHYSICAL = "💪"
@@ -104,8 +110,8 @@ class HeraldEmojis:
 
 # ===== VISUAL DISPLAY FUNCTIONS =====
 
-def create_health_bar(current_max: int, superficial: int, aggravated: int, max_possible: int = 8) -> str:
-    """Create health bar with validation and error handling"""
+def create_health_bar(current_max: int, superficial: int, aggravated: int, max_possible: int = 10) -> str:
+    """Create health bar with validation and error handling (always 10 dots)"""
     try:
         # Validate inputs
         current_max = max(0, min(current_max, max_possible))
@@ -180,12 +186,25 @@ def create_desperation_bar(desperation: int, max_desperation: int = 10) -> str:
     try:
         desperation = max(0, min(desperation, max_desperation))
         return (
-            HeraldEmojis.DESPERATION * desperation + 
+            HeraldEmojis.DESPERATION_FULL * desperation +
             HeraldEmojis.DESPERATION_EMPTY * (max_desperation - desperation)
         )
     except Exception as e:
         logger.error(f"Error creating desperation bar: {e}")
         return "❓" * max_desperation
+
+
+def create_danger_bar(danger: int, max_danger: int = 10) -> str:
+    """Create danger level display with validation"""
+    try:
+        danger = max(0, min(danger, max_danger))
+        return (
+            HeraldEmojis.DANGER_FULL * danger +
+            HeraldEmojis.DANGER_EMPTY * (max_danger - danger)
+        )
+    except Exception as e:
+        logger.error(f"Error creating danger bar: {e}")
+        return "❓" * max_danger
 
 
 def create_skill_display(dots: int, max_dots: int = 5) -> str:

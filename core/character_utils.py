@@ -359,68 +359,73 @@ def invalidate_character_cache(user_id: str, character_name: str = None):
 def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict[str, Any]]) -> discord.Embed:
     """Create an enhanced character sheet with full validation and error handling."""
     # Import here to avoid circular dependency
-    from core.ui_utils import HeraldEmojis, create_health_bar, create_willpower_bar, create_edge_bar, create_desperation_bar, create_skill_display
-    
+    from core.ui_utils import HeraldEmojis, create_health_bar, create_willpower_bar, create_desperation_bar, create_danger_bar, create_skill_display
+
     try:
         name = character.get('name', 'Unknown')
-        concept = character.get('concept', 'Hunter of the Supernatural')
         creed = character.get('creed', 'No creed set')
-        
+        drive = character.get('drive', 'No drive set')
+
         # Create main embed with Herald theme
         embed = discord.Embed(
             title=f"🏹 {name}",
-            description=f"*{concept}*",
             color=0x8B0000  # Dark red theme for Hunter
         )
-        
-        # === CORE STATS (Top Priority) ===
-        health_current = max(0, character.get('health', 0))
+
+        # === CREED & DRIVE (Full width) ===
+        embed.add_field(
+            name="Creed",
+            value=creed,
+            inline=False
+        )
+        embed.add_field(
+            name="Drive",
+            value=drive,
+            inline=False
+        )
+
+        # === CORE TRACKERS (All 10 dots) ===
+        # Health
+        health_current = max(0, min(10, character.get('health', 0)))
         health_sup = max(0, character.get('health_sup', 0))
         health_agg = max(0, character.get('health_agg', 0))
         health_bar = create_health_bar(health_current, health_sup, health_agg)
-        
-        willpower_current = max(0, character.get('willpower', 0))
+        health_remaining = max(0, health_current - health_sup - health_agg)
+
+        # Willpower
+        willpower_current = max(0, min(10, character.get('willpower', 0)))
         willpower_sup = max(0, character.get('willpower_sup', 0))
         willpower_agg = max(0, character.get('willpower_agg', 0))
         willpower_bar = create_willpower_bar(willpower_current, willpower_sup, willpower_agg)
-        
-        # Side-by-side layout for health/willpower
-        health_remaining = max(0, health_current - health_sup - health_agg)
         willpower_remaining = max(0, willpower_current - willpower_sup - willpower_agg)
-        
+
+        # Desperation
+        desperation = max(0, min(10, character.get('desperation', 0)))
+        desperation_bar = create_desperation_bar(desperation)
+
+        # Danger
+        danger = max(0, min(10, character.get('danger', 0)))
+        danger_bar = create_danger_bar(danger)
+
+        # Display trackers in 2x2 layout
         embed.add_field(
             name="Health",
-            value=f"{health_bar}\n`{health_remaining}/{health_current} remaining`",
+            value=f"{health_bar}\n`{health_remaining}/{health_current}`",
             inline=True
         )
         embed.add_field(
             name="Willpower",
-            value=f"{willpower_bar}\n`{willpower_remaining}/{willpower_current} remaining`",
-            inline=True
-        )
-        
-        # Edge and Desperation on same row
-        edge = max(0, min(5, character.get('edge', 0)))
-        desperation = max(0, min(10, character.get('desperation', 0)))
-        
-        edge_display = create_edge_bar(edge)
-        desperation_display = create_desperation_bar(desperation)
-        
-        embed.add_field(
-            name="Edge",
-            value=f"{edge_display}\n`{edge}/5`",
+            value=f"{willpower_bar}\n`{willpower_remaining}/{willpower_current}`",
             inline=True
         )
         embed.add_field(
             name="Desperation",
-            value=f"{desperation_display}\n`{desperation}/10`",
+            value=f"{desperation_bar}\n`{desperation}/10`",
             inline=True
         )
-        
-        # Add creed in remaining space
         embed.add_field(
-            name="Creed",
-            value=creed,
+            name="Danger",
+            value=f"{danger_bar}\n`{danger}/10`",
             inline=True
         )
         
