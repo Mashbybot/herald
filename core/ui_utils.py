@@ -41,11 +41,11 @@ class HeraldEmojis:
 
     # Desperation Tracker (10 dots)
     DESPERATION_FULL = "🟨"      # Yellow Square (filled)
-    DESPERATION_EMPTY = "⬛"     # Black Small Square (empty)
+    DESPERATION_EMPTY = "◾"      # Black Medium-Small Square (empty)
 
     # Danger Tracker (10 dots)
     DANGER_FULL = "🟥"           # Red Square (filled)
-    DANGER_EMPTY = "⬛"          # Black Small Square (empty)
+    DANGER_EMPTY = "◾"           # Black Medium-Small Square (empty)
     
     # Attributes
     PHYSICAL = "💪"
