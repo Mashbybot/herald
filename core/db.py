@@ -83,6 +83,7 @@ async def run_postgresql_migrations():
                 willpower_sup INTEGER DEFAULT 0 CHECK(willpower_sup >= 0),
                 willpower_agg INTEGER DEFAULT 0 CHECK(willpower_agg >= 0),
                 desperation INTEGER DEFAULT 0 CHECK(desperation >= 0 AND desperation <= 10),
+                in_despair BOOLEAN DEFAULT FALSE,
                 edge INTEGER DEFAULT 0 CHECK(edge >= 0 AND edge <= 5),
                 creed TEXT DEFAULT NULL,
                 ambition TEXT DEFAULT NULL,
@@ -166,7 +167,35 @@ async def run_postgresql_migrations():
                 FOREIGN KEY (user_id, character_name) REFERENCES characters(user_id, name) ON DELETE CASCADE
             );
         """)
-        
+
+        # Edges table (Hunter abilities)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS edges (
+                id SERIAL PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                character_name TEXT NOT NULL,
+                edge_name TEXT NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(user_id, character_name, edge_name),
+                FOREIGN KEY (user_id, character_name) REFERENCES characters(user_id, name) ON DELETE CASCADE
+            );
+        """)
+
+        # Perks table (Hunter abilities)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS perks (
+                id SERIAL PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                character_name TEXT NOT NULL,
+                perk_name TEXT NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(user_id, character_name, perk_name),
+                FOREIGN KEY (user_id, character_name) REFERENCES characters(user_id, name) ON DELETE CASCADE
+            );
+        """)
+
         # Create indexes for performance
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_characters_user_id ON characters(user_id);")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_characters_user_name ON characters(user_id, name);")
@@ -222,6 +251,7 @@ async def init_sqlite_db():
                 willpower_sup INTEGER DEFAULT 0 CHECK(willpower_sup >= 0),
                 willpower_agg INTEGER DEFAULT 0 CHECK(willpower_agg >= 0),
                 desperation INTEGER DEFAULT 0 CHECK(desperation >= 0 AND desperation <= 10),
+                in_despair BOOLEAN DEFAULT 0,
                 edge INTEGER DEFAULT 0 CHECK(edge >= 0 AND edge <= 5),
                 creed TEXT DEFAULT NULL,
                 ambition TEXT DEFAULT NULL,
@@ -300,6 +330,34 @@ async def init_sqlite_db():
                 amount INTEGER NOT NULL,
                 reason TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id, character_name) REFERENCES characters(user_id, name) ON DELETE CASCADE
+            );
+        """)
+
+        # Create edges table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS edges (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                character_name TEXT NOT NULL,
+                edge_name TEXT NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, character_name, edge_name),
+                FOREIGN KEY (user_id, character_name) REFERENCES characters(user_id, name) ON DELETE CASCADE
+            );
+        """)
+
+        # Create perks table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS perks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                character_name TEXT NOT NULL,
+                perk_name TEXT NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, character_name, perk_name),
                 FOREIGN KEY (user_id, character_name) REFERENCES characters(user_id, name) ON DELETE CASCADE
             );
         """)

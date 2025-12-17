@@ -89,6 +89,32 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
             inline=False
         )
 
+    # === STEP 10: Overreach/Despair warnings ===
+    if result.has_overreach:
+        # Check if this is a win or loss situation
+        is_win = result.total_successes >= difficulty if difficulty > 0 else result.total_successes > 0
+
+        if is_win:
+            # Win condition - player chooses Overreach or Despair
+            embed.add_field(
+                name="",
+                value=f"⚠️ **DESPERATION TRIGGERED** - Rolled {result.desperation_ones} one(s) on Desperation dice!\n\n"
+                      f"**Choose:**\n"
+                      f"🎯 Accept success + **Overreach** (Danger +{result.desperation_ones})\n"
+                      f"💀 Reject success + Enter **Despair**\n\n"
+                      f"Use `/overreach` or `/despair` to decide",
+                inline=False
+            )
+        else:
+            # Loss condition - automatic Despair
+            embed.add_field(
+                name="",
+                value=f"💀 **AUTOMATIC DESPAIR** - Failed roll + {result.desperation_ones} one(s) on Desperation dice\n\n"
+                      f"Drive becomes useless until redeemed.\n"
+                      f"Use `/enter_despair` to mark character state.",
+                inline=False
+            )
+
     return embed
 
 
@@ -125,10 +151,10 @@ class DiceRolling(commands.Cog):
     @app_commands.command(name="roll", description="Roll dice using H5E mechanics")
     @app_commands.describe(
         attribute="Attribute rating (0-5)",
-        skill="Skill rating (0-5)", 
+        skill="Skill rating (0-5)",
         difficulty="Target number of successes needed",
         edge="Number of edge dice to add",
-        desperation="Add desperation die to the roll",
+        desperation="Desperation rating (0-10) - adds this many desperation dice",
         modifier="Additional dice pool modifier"
     )
     @app_commands.choices(
@@ -149,33 +175,40 @@ class DiceRolling(commands.Cog):
         skill: int = 0,
         difficulty: int = 0,
         edge: int = 0,
-        desperation: bool = False,
+        desperation: int = 0,
         modifier: int = 0
     ):
         """Roll dice using H5E mechanics"""
-        
+
         # Validate inputs
         if attribute < 0 or attribute > 10:
             await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Attribute must be 0-10", 
+                f"{HeraldEmojis.ERROR} Attribute must be 0-10",
                 ephemeral=True
             )
             return
-        
+
         if skill < 0 or skill > 10:
             await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Skill must be 0-10", 
+                f"{HeraldEmojis.ERROR} Skill must be 0-10",
                 ephemeral=True
             )
             return
-        
+
         if edge < 0 or edge > 10:
             await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Edge must be 0-10", 
+                f"{HeraldEmojis.ERROR} Edge must be 0-10",
                 ephemeral=True
             )
             return
-        
+
+        if desperation < 0 or desperation > 10:
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Desperation must be 0-10",
+                ephemeral=True
+            )
+            return
+
         try:
             # Roll the dice
             result = roll_pool(attribute, skill, desperation, edge, 0)
@@ -190,9 +223,9 @@ class DiceRolling(commands.Cog):
                 pool_parts.append(f"Modifier {modifier:+d}")
             if edge > 0:
                 pool_parts.append(f"Edge {edge}")
-            if desperation:
-                pool_parts.append("Desperation")
-            
+            if desperation > 0:
+                pool_parts.append(f"Desperation {desperation}")
+
             effective_pool = max(1, attribute + skill + modifier)
             description = " + ".join(pool_parts) + f" = {effective_pool} dice"
             
@@ -219,7 +252,7 @@ class DiceRolling(commands.Cog):
         skill="Skill to use",
         difficulty="Target number of successes needed",
         edge="Override character's edge rating",
-        desperation="Force desperation roll",
+        use_desperation="Use Desperation dice (aligned with Drive)",
         modifier="Additional dice pool modifier"
     )
     @app_commands.choices(
@@ -243,12 +276,12 @@ class DiceRolling(commands.Cog):
         skill: str = None,
         difficulty: int = 0,
         edge: int = None,
-        desperation: bool = None,
+        use_desperation: bool = False,
         modifier: int = 0
     ):
         """Roll dice using character attributes and skills"""
         user_id = str(interaction.user.id)
-        
+
         try:
             # Find character
             char = await find_character(user_id, character)
@@ -256,45 +289,65 @@ class DiceRolling(commands.Cog):
                 error_msg = await HeraldMessages.character_not_found(user_id, character)
                 await interaction.response.send_message(error_msg, ephemeral=True)
                 return
-            
+
             # Get attribute value
             attr_value = 0
             if attribute:
                 attr_value = char.get(attribute, 0)
                 if attr_value is None:
                     attr_value = 0
-            
+
             # Get skill value
             skill_value = 0
             if skill:
                 skill_value = await get_character_skill(user_id, char['name'], skill)
                 if skill_value is None:
                     skill_value = 0
-            
+
             # Use character's edge if not overridden
             if edge is None:
                 edge = char.get('edge', 0) or 0
-            
+
             # Use character's danger rating automatically
             char_danger = char.get('danger', 0) or 0
             total_difficulty = difficulty + char_danger
-            
-            # Use character's desperation if not specified
-            if desperation is None:
-                char_desperation = char.get('desperation', 0) or 0
-                desperation = char_desperation >= 7  # High desperation triggers desperation dice
+
+            # Check Despair state and Desperation dice
+            in_despair = char.get('in_despair', False) or False
+            char_desperation = char.get('desperation', 0) or 0
+            desperation_dice = 0
+
+            if use_desperation:
+                if in_despair:
+                    # Cannot use Desperation dice when in Despair
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} **{char['name']}** is in Despair!\n"
+                        f"💀 Drive is unusable until redeemed.\n"
+                        f"🕊️ Redemption: {char.get('redemption', 'Not set')}",
+                        ephemeral=True
+                    )
+                    return
+                elif char_desperation > 0:
+                    # Use character's Desperation rating as Desperation dice
+                    desperation_dice = char_desperation
+                else:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} {char['name']} has no Desperation to use!",
+                        ephemeral=True
+                    )
+                    return
             
             # Validate edge override
             if edge < 0 or edge > 10:
                 await interaction.response.send_message(
-                    f"{HeraldEmojis.ERROR} Edge must be 0-10", 
+                    f"{HeraldEmojis.ERROR} Edge must be 0-10",
                     ephemeral=True
                 )
                 return
-            
+
             # Roll the dice
-            result = roll_pool(attr_value, skill_value, desperation, edge, 0)
-            
+            result = roll_pool(attr_value, skill_value, desperation_dice, edge, 0)
+
             # Create description
             pool_parts = []
             if attr_value > 0:
@@ -305,8 +358,8 @@ class DiceRolling(commands.Cog):
                 pool_parts.append(f"Modifier {modifier:+d}")
             if edge > 0:
                 pool_parts.append(f"Edge {edge}")
-            if desperation:
-                pool_parts.append("Desperation")
+            if desperation_dice > 0:
+                pool_parts.append(f"Desperation {desperation_dice}")
             
             effective_pool = max(1, attr_value + skill_value + modifier)
             description = " + ".join(pool_parts) + f" = {effective_pool} dice"

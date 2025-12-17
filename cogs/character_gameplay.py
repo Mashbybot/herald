@@ -825,8 +825,150 @@ class CharacterGameplay(commands.Cog):
                 ephemeral=True
             )
 
+    @app_commands.command(name="enter_despair", description="Mark your character as entering Despair state")
+    @app_commands.describe(
+        character="Character name"
+    )
+    async def enter_despair(self, interaction: discord.Interaction, character: str):
+        """Enter Despair state - Drive becomes unusable until redeemed"""
+        user_id = str(interaction.user.id)
+
+        try:
+            char = await find_character(user_id, character)
+
+            if not char:
+                error_msg = await HeraldMessages.character_not_found(user_id, character)
+                await interaction.response.send_message(error_msg, ephemeral=True)
+                return
+
+            # Check if already in Despair
+            if char.get('in_despair', False):
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} **{char['name']}** is already in Despair!",
+                    ephemeral=True
+                )
+                return
+
+            # Mark character as in Despair
+            async with get_async_db() as conn:
+                await conn.execute(
+                    "UPDATE characters SET in_despair = TRUE WHERE user_id = $1 AND name = $2",
+                    user_id, char['name']
+                )
+
+            # Create response
+            embed = discord.Embed(
+                title=f"💀 {char['name']} Enters Despair",
+                description=f"**Drive has failed.** {char['name']}'s motivations ring hollow.",
+                color=0x8B0000
+            )
+
+            if char.get('drive'):
+                embed.add_field(
+                    name=f"{HeraldEmojis.DRIVE} Broken Drive",
+                    value=char['drive'],
+                    inline=False
+                )
+
+            if char.get('redemption'):
+                embed.add_field(
+                    name=f"{HeraldEmojis.REDEMPTION} Path to Redemption",
+                    value=char['redemption'],
+                    inline=False
+                )
+            else:
+                embed.add_field(
+                    name=f"{HeraldEmojis.WARNING} No Redemption Set",
+                    value="Use `/drive character:Name redemption:\"method\"` to set how this character can redeem their Drive",
+                    inline=False
+                )
+
+            embed.add_field(
+                name="Effects",
+                value="• Cannot use Desperation dice\n• Drive is unusable\n• Must complete Redemption to recover",
+                inline=False
+            )
+
+            await interaction.response.send_message(embed=embed)
+            logger.info(f"{char['name']} entered Despair (user {user_id})")
+
+        except Exception as e:
+            logger.error(f"Error entering despair: {e}")
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Error entering Despair",
+                ephemeral=True
+            )
+
+    @app_commands.command(name="exit_despair", description="Mark your character as redeemed from Despair")
+    @app_commands.describe(
+        character="Character name"
+    )
+    async def exit_despair(self, interaction: discord.Interaction, character: str):
+        """Exit Despair state - Redemption completed"""
+        user_id = str(interaction.user.id)
+
+        try:
+            char = await find_character(user_id, character)
+
+            if not char:
+                error_msg = await HeraldMessages.character_not_found(user_id, character)
+                await interaction.response.send_message(error_msg, ephemeral=True)
+                return
+
+            # Check if in Despair
+            if not char.get('in_despair', False):
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} **{char['name']}** is not in Despair!",
+                    ephemeral=True
+                )
+                return
+
+            # Mark character as redeemed
+            async with get_async_db() as conn:
+                await conn.execute(
+                    "UPDATE characters SET in_despair = FALSE WHERE user_id = $1 AND name = $2",
+                    user_id, char['name']
+                )
+
+            # Create response
+            embed = discord.Embed(
+                title=f"🕊️ {char['name']} Redeemed",
+                description=f"**Drive restored.** {char['name']}'s purpose burns bright once more.",
+                color=0x228B22
+            )
+
+            if char.get('redemption'):
+                embed.add_field(
+                    name=f"{HeraldEmojis.REDEMPTION} Redemption Completed",
+                    value=char['redemption'],
+                    inline=False
+                )
+
+            if char.get('drive'):
+                embed.add_field(
+                    name=f"{HeraldEmojis.DRIVE} Restored Drive",
+                    value=char['drive'],
+                    inline=False
+                )
+
+            embed.add_field(
+                name="Effects",
+                value="• Can use Desperation dice again\n• Drive is active\n• Ready to hunt",
+                inline=False
+            )
+
+            await interaction.response.send_message(embed=embed)
+            logger.info(f"{char['name']} redeemed from Despair (user {user_id})")
+
+        except Exception as e:
+            logger.error(f"Error exiting despair: {e}")
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Error exiting Despair",
+                ephemeral=True
+            )
+
     # ===== HELPER METHODS FOR ROLL INTEGRATION =====
-    
+
     async def get_character_attribute(self, user_id: str, character_name: str, attribute: str) -> Optional[int]:
         """Get a specific attribute value for a character (for roll integration)"""
         try:
@@ -865,6 +1007,8 @@ class CharacterGameplay(commands.Cog):
     @ambition.autocomplete('character')
     @desire.autocomplete('character')
     @drive.autocomplete('character')
+    @enter_despair.autocomplete('character')
+    @exit_despair.autocomplete('character')
     async def gameplay_character_autocomplete(
         self,
         interaction: discord.Interaction,

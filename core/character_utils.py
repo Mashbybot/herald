@@ -136,14 +136,14 @@ async def get_character_and_skills(user_id: str, character_name: str) -> Tuple[O
     """
     cache_key = f"char_skills:{user_id}:{character_name.lower()}"
     cached_data = _character_cache.get(cache_key)
-    
+
     if cached_data is not None:
         return cached_data
-    
+
     try:
         # Get character first
         character = await find_character(user_id, character_name)
-        
+
         skills = []
         if character:
             from core.db import get_async_db
@@ -154,14 +154,44 @@ async def get_character_and_skills(user_id: str, character_name: str) -> Tuple[O
                     user_id, character['name']
                 )
                 skills = [dict(row) for row in skill_rows]
-        
+
         result = (character, skills)
         _character_cache.set(cache_key, result)
         return result
-        
+
     except Exception as e:
         logger.error(f"Error getting character and skills for '{character_name}' (user {user_id}): {e}")
         raise DatabaseError(f"Failed to get character and skills: {e}")
+
+
+async def get_character_edges(user_id: str, character_name: str) -> List[Dict[str, Any]]:
+    """Get character's Edge abilities."""
+    try:
+        from core.db import get_async_db
+        async with get_async_db() as conn:
+            edge_rows = await conn.fetch(
+                "SELECT edge_name, description FROM edges WHERE user_id = $1 AND character_name = $2 ORDER BY edge_name",
+                user_id, character_name
+            )
+            return [dict(row) for row in edge_rows]
+    except Exception as e:
+        logger.error(f"Error getting edges for '{character_name}' (user {user_id}): {e}")
+        return []
+
+
+async def get_character_perks(user_id: str, character_name: str) -> List[Dict[str, Any]]:
+    """Get character's Perk abilities."""
+    try:
+        from core.db import get_async_db
+        async with get_async_db() as conn:
+            perk_rows = await conn.fetch(
+                "SELECT perk_name, description FROM perks WHERE user_id = $1 AND character_name = $2 ORDER BY perk_name",
+                user_id, character_name
+            )
+            return [dict(row) for row in perk_rows]
+    except Exception as e:
+        logger.error(f"Error getting perks for '{character_name}' (user {user_id}): {e}")
+        return []
 
 
 async def get_character_attribute(user_id: str, character_name: str, attribute: str) -> Optional[int]:
@@ -356,10 +386,15 @@ def invalidate_character_cache(user_id: str, character_name: str = None):
 
 # ===== ENHANCED CHARACTER SHEET CREATION =====
 
-def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict[str, Any]]) -> discord.Embed:
+def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict[str, Any]],
+                                   edges: List[Dict[str, Any]] = None, perks: List[Dict[str, Any]] = None) -> discord.Embed:
     """Create an enhanced character sheet with full validation and error handling."""
     # Import here to avoid circular dependency
     from core.ui_utils import HeraldEmojis, create_health_bar, create_willpower_bar, create_desperation_bar, create_danger_bar, create_skill_display
+
+    # Default to empty lists if not provided
+    edges = edges or []
+    perks = perks or []
 
     try:
         name = character.get('name', 'Unknown')
@@ -402,6 +437,7 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         # Desperation
         desperation = max(0, min(10, character.get('desperation', 0)))
         desperation_bar = create_desperation_bar(desperation)
+        in_despair = character.get('in_despair', False)
 
         # Danger
         danger = max(0, min(10, character.get('danger', 0)))
@@ -428,7 +464,21 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
             value=f"{danger_bar}\n`{danger}/10`",
             inline=True
         )
-        
+
+        # Show Despair State if active
+        if in_despair:
+            embed.add_field(
+                name="",
+                value=f"💀 **IN DESPAIR** - Drive unusable until redeemed",
+                inline=False
+            )
+            if character.get('redemption'):
+                embed.add_field(
+                    name="",
+                    value=f"🕊️ *Redemption: {character['redemption']}*",
+                    inline=False
+                )
+
         # Add visual separator
         embed.add_field(name=HeraldEmojis.SEPARATOR, value="", inline=False)
         
@@ -490,19 +540,52 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
                     inline=False
                 )
         
+        # === EDGE AND PERKS (Hunter Abilities) ===
+        if edges:
+            edge_text = []
+            for edge in edges:
+                edge_name = edge.get('edge_name', 'Unknown')
+                edge_desc = edge.get('description', '')
+                if edge_desc:
+                    edge_text.append(f"**{edge_name}:** {edge_desc}")
+                else:
+                    edge_text.append(f"**{edge_name}**")
+
+            embed.add_field(
+                name=f"{HeraldEmojis.EDGE} Edge Abilities",
+                value="\n".join(edge_text),
+                inline=False
+            )
+
+        if perks:
+            perk_text = []
+            for perk in perks:
+                perk_name = perk.get('perk_name', 'Unknown')
+                perk_desc = perk.get('description', '')
+                if perk_desc:
+                    perk_text.append(f"**{perk_name}:** {perk_desc}")
+                else:
+                    perk_text.append(f"**{perk_name}**")
+
+            embed.add_field(
+                name="🎭 Perks",
+                value="\n".join(perk_text),
+                inline=False
+            )
+
         # === HUNTER MECHANICS ===
         h5e_mechanics = []
-        
+
         if character.get('ambition'):
             h5e_mechanics.append(f"{HeraldEmojis.AMBITION} **Ambition:** {character['ambition']}")
         if character.get('desire'):
             h5e_mechanics.append(f"{HeraldEmojis.DESIRE} **Desire:** {character['desire']}")
         if character.get('drive'):
             drive_text = f"{HeraldEmojis.DRIVE} **Drive:** {character['drive']}"
-            if character.get('redemption'):
+            if character.get('redemption') and not in_despair:
                 drive_text += f"\n{HeraldEmojis.REDEMPTION} *Redemption:* {character['redemption']}"
             h5e_mechanics.append(drive_text)
-        
+
         if h5e_mechanics:
             embed.add_field(
                 name="Hunter Mechanics",
