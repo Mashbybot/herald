@@ -467,131 +467,35 @@ class CharacterManagement(commands.Cog):
     @app_commands.command(name="sheet", description="View your Hunter character sheet")
     @app_commands.describe(name="Character name (autocompletes to your characters)")
     async def character_sheet(self, interaction: discord.Interaction, name: str):
-        """Display a character sheet with full details"""
+        """Display a character sheet with full details using enhanced character sheet"""
         user_id = str(interaction.user.id)
-        
+
         try:
+            # Import the enhanced character sheet creator and edge/perk fetchers
+            from core.character_utils import (
+                create_enhanced_character_sheet,
+                get_character_edges,
+                get_character_perks
+            )
+
+            # Get character and skills
             character, skills = await get_character_and_skills(user_id, name)
-            
+
             if not character:
                 await interaction.response.send_message(
                     f"⚠️ No character named **{name}** found", ephemeral=True
                 )
                 return
 
-            embed = discord.Embed(
-                title=f"📋 {character['name']}'s Character Sheet",
-                color=0x4169E1
-            )
-            
-            # Physical attributes
-            embed.add_field(
-                name="💪 Physical",
-                value=(
-                    f"Strength: {character['strength']}\n"
-                    f"Dexterity: {character['dexterity']}\n"
-                    f"Stamina: {character['stamina']}"
-                ),
-                inline=True
-            )
-            
-            # Social attributes
-            embed.add_field(
-                name="✨ Social",
-                value=(
-                    f"Charisma: {character['charisma']}\n"
-                    f"Manipulation: {character['manipulation']}\n"
-                    f"Composure: {character['composure']}"
-                ),
-                inline=True
-            )
-            
-            # Mental attributes
-            embed.add_field(
-                name="🧠 Mental",
-                value=(
-                    f"Intelligence: {character['intelligence']}\n"
-                    f"Wits: {character['wits']}\n"
-                    f"Resolve: {character['resolve']}"
-                ),
-                inline=True
-            )
-            
-            # Health and Willpower
-            health_bar = create_health_bar(
-                character['health'],
-                safe_get_character_field(character, 'health_sup', 0),
-                safe_get_character_field(character, 'health_agg', 0)
-            )
-            
-            willpower_bar = create_willpower_bar(
-                character['willpower'],
-                safe_get_character_field(character, 'willpower_sup', 0),
-                safe_get_character_field(character, 'willpower_agg', 0)
-            )
-            
-            embed.add_field(
-                name="❤️ Health",
-                value=health_bar,
-                inline=False
-            )
-            
-            embed.add_field(
-                name="💙 Willpower",
-                value=willpower_bar,
-                inline=False
-            )
-            
-            # Hunter mechanics
-            edge = safe_get_character_field(character, 'edge', 0)
-            desperation = safe_get_character_field(character, 'desperation', 0)
-            
-            if edge or desperation:
-                embed.add_field(
-                    name="🎯 Hunter Mechanics",
-                    value=f"⚡ Edge: {edge}/5\n😈 Desperation: {desperation}/10",
-                    inline=False
-                )
-            
-            # Skills - show only trained skills
-            trained_skills = [s for s in skills if s['dots'] > 0]
-            if trained_skills:
-                # Group by category
-                skills_by_category = {cat: [] for cat in H5E_SKILLS.keys()}
-                for skill in trained_skills:
-                    for cat, cat_skills in H5E_SKILLS.items():
-                        if skill['skill_name'] in cat_skills:
-                            skills_by_category[cat].append(f"{skill['skill_name']}: {'●' * skill['dots']}")
-                            break
-                
-                for category, skill_list in skills_by_category.items():
-                    if skill_list:
-                        embed.add_field(
-                            name=f"📚 {category} Skills",
-                            value="\n".join(skill_list),
-                            inline=True
-                        )
-            
-            # Touchstones
-            touchstones = []
-            if safe_get_character_field(character, 'ambition'):
-                touchstones.append(f"**Ambition:** {character['ambition']}")
-            if safe_get_character_field(character, 'desire'):
-                touchstones.append(f"**Desire:** {character['desire']}")
-            if safe_get_character_field(character, 'drive'):
-                touchstones.append(f"**Drive:** {character['drive']}")
-            
-            if touchstones:
-                embed.add_field(
-                    name="🎭 Touchstones",
-                    value="\n".join(touchstones),
-                    inline=False
-                )
-            
-            embed.set_footer(text="🔸 Pattern current | Use /help for operations")
-            
+            # Get edges and perks
+            edges = await get_character_edges(user_id, character['name'])
+            perks = await get_character_perks(user_id, character['name'])
+
+            # Create enhanced character sheet with all features
+            embed = create_enhanced_character_sheet(character, skills, edges, perks)
+
             await interaction.response.send_message(embed=embed)
-            
+
         except Exception as e:
             self.logger.error(f"Error displaying character sheet: {e}", exc_info=True)
             await interaction.response.send_message(
