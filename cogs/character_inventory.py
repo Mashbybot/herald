@@ -596,10 +596,4 @@ async def setup(bot: commands.Bot):
     """Setup function for the Character Inventory cog"""
     cog = CharacterInventory(bot)
     await bot.add_cog(cog)
-    
-    if GUILD_ID:
-        for command in cog.get_app_commands():
-            bot.tree.add_command(command, guild=discord.Object(id=GUILD_ID))
-        logger.info(f"Character Inventory cog loaded with {len(cog.get_app_commands())} guild commands")
-    else:
-        logger.info(f"Character Inventory cog loaded with {len(cog.get_app_commands())} global commands")
+    logger.info(f"Character Inventory cog loaded with {len(cog.get_app_commands())} commands")

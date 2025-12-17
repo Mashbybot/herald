@@ -95,15 +95,15 @@ class HeraldBot(commands.Bot):
         # Sync commands
         try:
             if GUILD_ID:
-                # Development mode - sync to specific guild (faster)
+                # Development mode - sync to specific guild (instant updates)
                 guild = discord.Object(id=GUILD_ID)
-                self.tree.copy_global_to(guild=guild)
                 synced = await self.tree.sync(guild=guild)
-                self.logger.info(f"⚡ Synced {len(synced)} commands to development guild {GUILD_ID}")
+                self.logger.info(f"⚡ Synced {len(synced)} commands to guild {GUILD_ID} (instant)")
             else:
-                # Production mode - sync globally (slower, up to 1 hour)
+                # Production mode - sync globally (may take up to 1 hour)
                 synced = await self.tree.sync()
-                self.logger.info(f"🌍 Synced {len(synced)} commands globally (may take up to 1 hour to appear)")
+                self.logger.info(f"🌍 Synced {len(synced)} commands globally")
+                self.logger.warning(f"⏰ Global command sync can take up to 1 hour to propagate to all servers")
         except Exception as e:
             self.logger.error(f"❌ Command sync failed: {e}")
 

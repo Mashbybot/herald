@@ -711,11 +711,4 @@ async def setup(bot: commands.Bot):
     """Setup function for the Dice Rolling cog"""
     cog = DiceRolling(bot)
     await bot.add_cog(cog)
-    
-    # Only register guild commands if GUILD_ID is set (development mode)
-    if GUILD_ID:
-        for command in cog.get_app_commands():
-            bot.tree.add_command(command, guild=discord.Object(id=GUILD_ID))
-        logger.info(f"Dice Rolling cog loaded with {len(cog.get_app_commands())} guild commands")
-    else:
-        logger.info(f"Dice Rolling cog loaded with {len(cog.get_app_commands())} global commands")
+    logger.info(f"Dice Rolling cog loaded with {len(cog.get_app_commands())} commands")
