@@ -444,6 +444,7 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         danger_bar = create_danger_bar(danger)
 
         # Display trackers in 2x2 layout
+        # Note: Discord embeds show 3 inline fields per row, so we need a spacer to force 2x2
         embed.add_field(
             name="__Health__",
             value=f"{health_bar}\n`{health_remaining}/{health_current}`",
@@ -454,6 +455,9 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
             value=f"{willpower_bar}\n`{willpower_remaining}/{willpower_current}`",
             inline=True
         )
+        # Spacer to force next row (Discord shows 3 fields per row)
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
+
         embed.add_field(
             name="__Desperation__",
             value=f"{desperation_bar}\n`{desperation}/10`",
@@ -464,6 +468,8 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
             value=f"{danger_bar}\n`{danger}/10`",
             inline=True
         )
+        # Spacer to balance the row
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
 
         # Show Despair State if active
         if in_despair:
