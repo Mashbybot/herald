@@ -921,7 +921,6 @@ class CharacterGameplay(commands.Cog):
     
     @apply_damage.autocomplete('character')
     @heal_damage.autocomplete('character')
-    @edge.autocomplete('character')
     @desperation.autocomplete('character')
     @creed.autocomplete('character')
     @ambition.autocomplete('character')
