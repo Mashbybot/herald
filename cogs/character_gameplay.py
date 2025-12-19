@@ -12,7 +12,7 @@ import logging
 from core.db import get_async_db
 from core.character_utils import (
     find_character, character_autocomplete, get_character_and_skills,
-    ensure_h5e_columns, ALL_SKILLS, H5E_SKILLS, HeraldMessages
+    ensure_h5e_columns, ALL_SKILLS, H5E_SKILLS, HeraldMessages, resolve_character
 )
 from core.ui_utils import (
     HeraldEmojis, HeraldMessages, HeraldColors, create_health_bar, create_willpower_bar,
@@ -48,7 +48,7 @@ class CharacterGameplay(commands.Cog):
 
     @app_commands.command(name="damage", description="Apply health or willpower damage to your character")
     @app_commands.describe(
-        character="Character name",
+        character="Character name (optional - uses active character if not specified)",
         track="Damage track (health or willpower)",
         amount="Amount of damage to apply",
         damage_type="Type of damage (superficial or aggravated)"
@@ -63,31 +63,34 @@ class CharacterGameplay(commands.Cog):
             app_commands.Choice(name="Aggravated", value="aggravated")
         ]
     )
+    @app_commands.autocomplete(character=character_autocomplete)
     async def apply_damage(
         self,
         interaction: discord.Interaction,
-        character: str,
         track: str,
         amount: int,
-        damage_type: str = "superficial"
+        damage_type: str = "superficial",
+        character: str = None
     ):
         """Apply damage to a character's health or willpower"""
         user_id = str(interaction.user.id)
-        
+
         if amount < 1:
             await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Damage amount must be positive", 
+                f"{HeraldEmojis.ERROR} Damage amount must be positive",
                 ephemeral=True
             )
             return
 
         try:
-            # Use fuzzy character matching
-            char = await find_character(user_id, character)
-            
+            # Resolve character (uses active if not specified)
+            char = await resolve_character(user_id, character)
+
             if not char:
-                error_msg = await HeraldMessages.character_not_found(user_id, character)
-                await interaction.response.send_message(error_msg, ephemeral=True)
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No character specified and no active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
                 return
 
             # Determine fields to update
@@ -167,7 +170,7 @@ class CharacterGameplay(commands.Cog):
 
     @app_commands.command(name="heal", description="Heal damage from your character")
     @app_commands.describe(
-        character="Character name",
+        character="Character name (optional - uses active character if not specified)",
         track="Track to heal (health or willpower)",
         heal_type="Type of damage to heal",
         amount="Amount to heal (required for superficial/aggravated)"
@@ -183,13 +186,14 @@ class CharacterGameplay(commands.Cog):
             app_commands.Choice(name="Aggravated", value="aggravated")
         ]
     )
+    @app_commands.autocomplete(character=character_autocomplete)
     async def heal_damage(
         self,
         interaction: discord.Interaction,
-        character: str,
         track: str,
         heal_type: str,
-        amount: int = None
+        amount: int = None,
+        character: str = None
     ):
         """Heal damage from a character"""
         user_id = str(interaction.user.id)
@@ -197,17 +201,19 @@ class CharacterGameplay(commands.Cog):
         # Validate amount for non-"all" healing
         if heal_type != "all" and (amount is None or amount < 1):
             await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Please specify a positive amount to heal", 
+                f"{HeraldEmojis.ERROR} Please specify a positive amount to heal",
                 ephemeral=True
             )
             return
 
         try:
-            char = await find_character(user_id, character)
-            
+            char = await resolve_character(user_id, character)
+
             if not char:
-                error_msg = await HeraldMessages.character_not_found(user_id, character)
-                await interaction.response.send_message(error_msg, ephemeral=True)
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No character specified and no active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
                 return
 
             # Determine fields
@@ -284,9 +290,9 @@ class CharacterGameplay(commands.Cog):
 
     @app_commands.command(name="desperation", description="View or modify your character's Desperation level")
     @app_commands.describe(
-        character="Character name",
         action="What to do with Desperation",
-        amount="Amount to add/subtract/set (optional for 'view')"
+        amount="Amount to add/subtract/set (optional for 'view')",
+        character="Character name (optional - uses active character if not specified)"
     )
     @app_commands.choices(action=[
         app_commands.Choice(name="View", value="view"),
@@ -294,18 +300,20 @@ class CharacterGameplay(commands.Cog):
         app_commands.Choice(name="Add", value="add"),
         app_commands.Choice(name="Subtract", value="subtract")
     ])
-    async def desperation(self, interaction: discord.Interaction, character: str, action: str, amount: int = None):
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def desperation(self, interaction: discord.Interaction, action: str, amount: int = None, character: str = None):
         """Manage character Desperation levels (0-10)"""
-        
+
         user_id = str(interaction.user.id)
-        
+
         try:
-            # Use fuzzy character matching
-            char = await find_character(user_id, character)
-            
+            char = await resolve_character(user_id, character)
+
             if not char:
-                error_msg = await HeraldMessages.character_not_found(user_id, character)
-                await interaction.response.send_message(error_msg, ephemeral=True)
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No character specified and no active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
                 return
             
             current_desperation = safe_get_character_field(char, 'desperation', 0)
@@ -401,8 +409,8 @@ class CharacterGameplay(commands.Cog):
 
     @app_commands.command(name="creed", description="View or set your character's Hunter Creed")
     @app_commands.describe(
-        character="Character name",
-        creed="Hunter Creed (leave empty to view current)"
+        creed="Hunter Creed (leave empty to view current)",
+        character="Character name (optional - uses active character if not specified)"
     )
     @app_commands.choices(creed=[
         app_commands.Choice(name="Entrepreneurial - Building, inventing, repairing", value="Entrepreneurial"),
@@ -411,17 +419,20 @@ class CharacterGameplay(commands.Cog):
         app_commands.Choice(name="Martial - Physical conflict", value="Martial"),
         app_commands.Choice(name="Underground - Stealth and subterfuge", value="Underground")
     ])
-    async def creed(self, interaction: discord.Interaction, character: str, creed: str = None):
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def creed(self, interaction: discord.Interaction, creed: str = None, character: str = None):
         """Manage character Creed (Hunter type/philosophy)"""
 
         user_id = str(interaction.user.id)
 
         try:
-            char = await find_character(user_id, character)
+            char = await resolve_character(user_id, character)
 
             if not char:
-                error_msg = await HeraldMessages.character_not_found(user_id, character)
-                await interaction.response.send_message(error_msg, ephemeral=True)
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No character specified and no active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
                 return
 
             # If no creed provided, show current
@@ -488,29 +499,32 @@ class CharacterGameplay(commands.Cog):
 
     @app_commands.command(name="ambition", description="View or set your character's Ambition")
     @app_commands.describe(
-        character="Character name",
-        ambition="Long-term goal (leave empty to view current ambition)"
+        ambition="Long-term goal (leave empty to view current ambition)",
+        character="Character name (optional - uses active character if not specified)"
     )
-    async def ambition(self, interaction: discord.Interaction, character: str, ambition: str = None):
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def ambition(self, interaction: discord.Interaction, ambition: str = None, character: str = None):
         """Manage character Ambition (long-term goal that recovers aggravated willpower damage)"""
-        
+
         user_id = str(interaction.user.id)
-        
+
         if ambition and len(ambition) > 200:
             await interaction.response.send_message(
                 f"{HeraldEmojis.ERROR} Ambition must be 200 characters or less", 
                 ephemeral=True
             )
             return
-        
+
         try:
-            char = await find_character(user_id, character)
-            
+            char = await resolve_character(user_id, character)
+
             if not char:
-                error_msg = await HeraldMessages.character_not_found(user_id, character)
-                await interaction.response.send_message(error_msg, ephemeral=True)
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No character specified and no active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
                 return
-            
+
             current_ambition = char['ambition']
             
             # If no ambition provided, show current ambition
@@ -568,10 +582,11 @@ class CharacterGameplay(commands.Cog):
 
     @app_commands.command(name="desire", description="View or set your character's Desire")
     @app_commands.describe(
-        character="Character name",
-        desire="Short-term goal (leave empty to view current desire)"
+        desire="Short-term goal (leave empty to view current desire)",
+        character="Character name (optional - uses active character if not specified)"
     )
-    async def desire(self, interaction: discord.Interaction, character: str, desire: str = None):
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def desire(self, interaction: discord.Interaction, desire: str = None, character: str = None):
         """Manage character Desire (short-term goal that recovers superficial willpower damage)"""
         
         user_id = str(interaction.user.id)
@@ -582,15 +597,17 @@ class CharacterGameplay(commands.Cog):
                 ephemeral=True
             )
             return
-        
+
         try:
-            char = await find_character(user_id, character)
-            
+            char = await resolve_character(user_id, character)
+
             if not char:
-                error_msg = await HeraldMessages.character_not_found(user_id, character)
-                await interaction.response.send_message(error_msg, ephemeral=True)
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No character specified and no active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
                 return
-            
+
             current_desire = char['desire']
             
             # If no desire provided, show current desire
@@ -648,8 +665,8 @@ class CharacterGameplay(commands.Cog):
 
     @app_commands.command(name="drive", description="View or set your character's Drive and Redemption")
     @app_commands.describe(
-        character="Character name",
-        drive="Your Drive (why you hunt) - leave empty to view current"
+        drive="Your Drive (why you hunt) - leave empty to view current",
+        character="Character name (optional - uses active character if not specified)"
     )
     @app_commands.choices(drive=[
         app_commands.Choice(name="Curiosity - Uncover new information about your quarry", value="Curiosity"),
@@ -660,7 +677,8 @@ class CharacterGameplay(commands.Cog):
         app_commands.Choice(name="Envy - Ally with your quarry", value="Envy"),
         app_commands.Choice(name="Atonement - Protect someone from your quarry", value="Atonement")
     ])
-    async def drive(self, interaction: discord.Interaction, character: str, drive: str = None):
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def drive(self, interaction: discord.Interaction, drive: str = None, character: str = None):
         """Manage character Drive (reason for hunting) and Redemption (healing from Despair)"""
 
         user_id = str(interaction.user.id)
@@ -677,11 +695,13 @@ class CharacterGameplay(commands.Cog):
         }
 
         try:
-            char = await find_character(user_id, character)
+            char = await resolve_character(user_id, character)
 
             if not char:
-                error_msg = await HeraldMessages.character_not_found(user_id, character)
-                await interaction.response.send_message(error_msg, ephemeral=True)
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No character specified and no active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
                 return
 
             current_drive = char['drive']
@@ -747,18 +767,21 @@ class CharacterGameplay(commands.Cog):
 
     @app_commands.command(name="enter_despair", description="Mark your character as entering Despair state")
     @app_commands.describe(
-        character="Character name"
+        character="Character name (optional - uses active character if not specified)"
     )
-    async def enter_despair(self, interaction: discord.Interaction, character: str):
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def enter_despair(self, interaction: discord.Interaction, character: str = None):
         """Enter Despair state - Drive becomes unusable until redeemed"""
         user_id = str(interaction.user.id)
 
         try:
-            char = await find_character(user_id, character)
+            char = await resolve_character(user_id, character)
 
             if not char:
-                error_msg = await HeraldMessages.character_not_found(user_id, character)
-                await interaction.response.send_message(error_msg, ephemeral=True)
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No character specified and no active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
                 return
 
             # Check if already in Despair
@@ -821,18 +844,21 @@ class CharacterGameplay(commands.Cog):
 
     @app_commands.command(name="exit_despair", description="Mark your character as redeemed from Despair")
     @app_commands.describe(
-        character="Character name"
+        character="Character name (optional - uses active character if not specified)"
     )
-    async def exit_despair(self, interaction: discord.Interaction, character: str):
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def exit_despair(self, interaction: discord.Interaction, character: str = None):
         """Exit Despair state - Redemption completed"""
         user_id = str(interaction.user.id)
 
         try:
-            char = await find_character(user_id, character)
+            char = await resolve_character(user_id, character)
 
             if not char:
-                error_msg = await HeraldMessages.character_not_found(user_id, character)
-                await interaction.response.send_message(error_msg, ephemeral=True)
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No character specified and no active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
                 return
 
             # Check if in Despair
