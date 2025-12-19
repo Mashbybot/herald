@@ -32,9 +32,96 @@ def safe_get_character_field(character, field, default=None):
         return default
 
 
+class CharacterSelectionView(discord.ui.View):
+    """Interactive button view for selecting active character"""
+
+    def __init__(self, user_id: str, characters: List[dict], active_character_name: str = None, timeout: float = 60):
+        super().__init__(timeout=timeout)
+        self.user_id = user_id
+        self.selected_character = None
+
+        # Dynamically create buttons for each character
+        for i, char in enumerate(characters):
+            char_name = char['name']
+            # Use different style for active character
+            is_active = active_character_name and char_name == active_character_name
+            style = discord.ButtonStyle.success if is_active else discord.ButtonStyle.primary
+            label = f"{char_name}" + (" (Active)" if is_active else "")
+
+            # Create button with emoji based on position
+            emojis = ["1️⃣", "2️⃣", "3️⃣"]
+            emoji = emojis[i] if i < len(emojis) else "🔸"
+
+            button = discord.ui.Button(
+                label=label,
+                style=style,
+                emoji=emoji,
+                custom_id=f"char_{i}"
+            )
+            button.callback = self._create_callback(char_name)
+            self.add_item(button)
+
+    def _create_callback(self, character_name: str):
+        """Create a callback function for a specific character"""
+        async def callback(interaction: discord.Interaction):
+            await self._select_character(interaction, character_name)
+        return callback
+
+    async def _select_character(self, interaction: discord.Interaction, character_name: str):
+        """Handle character selection"""
+        try:
+            from core.character_utils import set_active_character
+
+            # Set the active character
+            success = await set_active_character(self.user_id, character_name)
+
+            if not success:
+                await interaction.response.send_message(
+                    f"❌ Error setting active character to **{character_name}**",
+                    ephemeral=True
+                )
+                return
+
+            # Create success embed
+            embed = discord.Embed(
+                title="🔸 Active Character Set",
+                description=f"Now playing as **{character_name}**\n\nAll commands will now default to this character",
+                color=HeraldColors.ORANGE
+            )
+
+            embed.add_field(
+                name="💡 Tip",
+                value="Use `/character` to switch between your characters at any time",
+                inline=False
+            )
+
+            # Disable all buttons
+            for item in self.children:
+                item.disabled = True
+
+            await interaction.response.edit_message(embed=embed, view=self)
+            logger.info(f"User {self.user_id} set active character to: {character_name}")
+
+        except Exception as e:
+            logger.error(f"Error selecting character: {e}")
+            await interaction.response.send_message(
+                f"❌ Error setting active character: {str(e)}",
+                ephemeral=True
+            )
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Ensure only the original user can interact"""
+        return str(interaction.user.id) == self.user_id
+
+    async def on_timeout(self):
+        """Handle timeout"""
+        for item in self.children:
+            item.disabled = True
+
+
 class DeleteConfirmationView(discord.ui.View):
     """Confirmation view for character deletion"""
-    
+
     def __init__(self, user_id: str, character_name: str, timeout: float = 30):
         super().__init__(timeout=timeout)
         self.user_id = user_id
@@ -427,12 +514,13 @@ class CharacterManagement(commands.Cog):
                 f"❌ Error renaming character: {str(e)}", ephemeral=True
             )
 
-    @app_commands.command(name="characters", description="List your characters")
-    async def list_characters(self, interaction: discord.Interaction):
-        """List all characters for the user"""
+    @app_commands.command(name="character", description="View and switch between your characters")
+    async def set_character(self, interaction: discord.Interaction):
+        """Display all characters as clickable buttons for selection"""
         user_id = str(interaction.user.id)
-        
+
         try:
+            # Fetch all user's characters
             async with get_async_db() as conn:
                 characters = await conn.fetch(
                     "SELECT name FROM characters WHERE user_id = $1 ORDER BY name",
@@ -449,7 +537,10 @@ class CharacterManagement(commands.Cog):
             # Get active character
             active_char_name = await get_active_character(user_id)
 
-            # Build character list with active indicator
+            # Create selection view
+            view = CharacterSelectionView(user_id, characters, active_char_name)
+
+            # Build character list for embed description
             char_list = []
             for char in characters:
                 if active_char_name and char['name'] == active_char_name:
@@ -459,73 +550,29 @@ class CharacterManagement(commands.Cog):
 
             embed = discord.Embed(
                 title="🔸 Your Hunters",
-                description="\n".join(char_list),
+                description="Select a character to set as your active Hunter:\n\n" + "\n".join(char_list),
                 color=HeraldColors.ORANGE
             )
 
             if active_char_name:
                 embed.add_field(
-                    name="💡 Tip",
-                    value="Commands will default to your active character. Use `/character` to switch.",
+                    name="💡 Current Active",
+                    value=f"Commands currently default to **{active_char_name}**",
                     inline=False
                 )
             else:
                 embed.add_field(
-                    name="💡 Tip",
-                    value="Set an active character with `/character` to skip typing character names!",
+                    name="💡 No Active Character",
+                    value="Select a character below to set as active",
                     inline=False
                 )
 
-            embed.set_footer(text="Use /sheet <name> to view a character sheet")
-
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            
-        except Exception as e:
-            self.logger.error(f"Error listing characters: {e}")
-            await interaction.response.send_message(
-                f"❌ Error loading characters: {str(e)}", ephemeral=True
-            )
-
-    @app_commands.command(name="character", description="Switch your active character")
-    @app_commands.describe(name="Character name to set as active")
-    @app_commands.autocomplete(name=character_autocomplete)
-    async def set_character(self, interaction: discord.Interaction, name: str):
-        """Set active character for streamlined command usage"""
-        user_id = str(interaction.user.id)
-
-        try:
-            # Verify character exists and set as active
-            success = await set_active_character(user_id, name)
-
-            if not success:
-                await interaction.response.send_message(
-                    f"⚠️ No character named **{name}** found",
-                    ephemeral=True
-                )
-                return
-
-            # Get the normalized character name
-            char = await find_character(user_id, name)
-
-            embed = discord.Embed(
-                title="🔸 Active Character Set",
-                description=f"Now playing as **{char['name']}**\n\nAll commands will now default to this character",
-                color=HeraldColors.ORANGE
-            )
-
-            embed.add_field(
-                name="💡 Tip",
-                value="Use `/character` to switch between your characters at any time",
-                inline=False
-            )
-
-            await interaction.response.send_message(embed=embed)
-            self.logger.info(f"User {user_id} set active character to: {char['name']}")
+            await interaction.response.send_message(embed=embed, view=view)
 
         except Exception as e:
-            self.logger.error(f"Error setting active character: {e}")
+            self.logger.error(f"Error displaying character selection: {e}")
             await interaction.response.send_message(
-                f"❌ Error setting active character: {str(e)}",
+                f"❌ Error loading characters: {str(e)}",
                 ephemeral=True
             )
 
