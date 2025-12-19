@@ -10,7 +10,7 @@ from typing import List
 import logging
 
 from core.db import get_async_db
-from core.character_utils import find_character, character_autocomplete, ALL_SKILLS
+from core.character_utils import find_character, character_autocomplete, ALL_SKILLS, resolve_character
 from core.ui_utils import HeraldColors, HeraldMessages
 from config.settings import GUILD_ID
 
