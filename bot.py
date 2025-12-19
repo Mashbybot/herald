@@ -59,7 +59,7 @@ class HeraldBot(commands.Bot):
     async def setup_hook(self):
         """Called when the bot is starting up"""
         self.logger.info("🏹 Starting Herald bot setup...")
-        
+
         # Initialize database
         try:
             await init_database()
@@ -67,7 +67,16 @@ class HeraldBot(commands.Bot):
         except Exception as e:
             self.logger.error(f"❌ Database initialization failed: {e}")
             raise
-        
+
+        # Ensure H5E columns exist (migration for existing databases)
+        try:
+            from core.character_utils import ensure_h5e_columns
+            await ensure_h5e_columns()
+            self.logger.info("✅ H5E database schema verified")
+        except Exception as e:
+            self.logger.error(f"❌ H5E schema verification failed: {e}")
+            raise
+
         # Load all cogs
         cogs_to_load = [
             'cogs.system',
