@@ -355,9 +355,11 @@ async def ensure_h5e_columns():
             # H5E mechanics columns
             h5e_columns = {
                 'ambition': 'TEXT DEFAULT NULL',
-                'desire': 'TEXT DEFAULT NULL', 
+                'desire': 'TEXT DEFAULT NULL',
                 'drive': 'TEXT DEFAULT NULL',
-                'redemption': 'TEXT DEFAULT NULL'
+                'redemption': 'TEXT DEFAULT NULL',
+                'experience_total': 'INTEGER DEFAULT 0',
+                'experience_spent': 'INTEGER DEFAULT 0'
             }
             
             # Add missing columns

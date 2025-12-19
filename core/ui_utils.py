@@ -38,6 +38,7 @@ class HeraldEmojis:
     # H5E Mechanics
     EDGE = "⚡"
     EDGE_EMPTY = "🔹"
+    DESPERATION = "😰"           # Anxious Face with Sweat
 
     # Desperation Tracker (10 dots)
     DESPERATION_FULL = "🟨"      # Yellow Square (filled)
