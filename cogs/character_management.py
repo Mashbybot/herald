@@ -14,7 +14,8 @@ import logging
 from core.db import get_async_db
 from core.character_utils import (
     find_character, character_autocomplete, get_character_and_skills,
-    ensure_h5e_columns, ALL_SKILLS, H5E_SKILLS
+    ensure_h5e_columns, ALL_SKILLS, H5E_SKILLS, get_active_character,
+    set_active_character
 )
 from core.ui_utils import create_health_bar, create_willpower_bar, HeraldColors, HeraldMessages
 from config.settings import GUILD_ID
@@ -462,6 +463,49 @@ class CharacterManagement(commands.Cog):
             self.logger.error(f"Error listing characters: {e}")
             await interaction.response.send_message(
                 f"❌ Error loading characters: {str(e)}", ephemeral=True
+            )
+
+    @app_commands.command(name="character", description="Switch your active character")
+    @app_commands.describe(name="Character name to set as active")
+    @app_commands.autocomplete(name=character_autocomplete)
+    async def set_character(self, interaction: discord.Interaction, name: str):
+        """Set active character for streamlined command usage"""
+        user_id = str(interaction.user.id)
+
+        try:
+            # Verify character exists and set as active
+            success = await set_active_character(user_id, name)
+
+            if not success:
+                await interaction.response.send_message(
+                    f"⚠️ No character named **{name}** found",
+                    ephemeral=True
+                )
+                return
+
+            # Get the normalized character name
+            char = await find_character(user_id, name)
+
+            embed = discord.Embed(
+                title="🔸 Active Character Set",
+                description=f"Now playing as **{char['name']}**\n\nAll commands will now default to this character",
+                color=HeraldColors.ORANGE
+            )
+
+            embed.add_field(
+                name="💡 Tip",
+                value="Use `/character` to switch between your characters at any time",
+                inline=False
+            )
+
+            await interaction.response.send_message(embed=embed)
+            self.logger.info(f"User {user_id} set active character to: {char['name']}")
+
+        except Exception as e:
+            self.logger.error(f"Error setting active character: {e}")
+            await interaction.response.send_message(
+                f"❌ Error setting active character: {str(e)}",
+                ephemeral=True
             )
 
     @app_commands.command(name="sheet", description="View your Hunter character sheet")

@@ -195,6 +195,15 @@ async def run_postgresql_migrations():
             );
         """)
 
+        # User settings table (active character tracking)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_settings (
+                user_id TEXT PRIMARY KEY,
+                active_character_name TEXT DEFAULT NULL,
+                updated_at TIMESTAMP DEFAULT NOW()
+            );
+        """)
+
         # Create indexes for performance
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_characters_user_id ON characters(user_id);")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_characters_user_name ON characters(user_id, name);")
@@ -357,6 +366,15 @@ async def init_sqlite_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(user_id, character_name, perk_name),
                 FOREIGN KEY (user_id, character_name) REFERENCES characters(user_id, name) ON DELETE CASCADE
+            );
+        """)
+
+        # Create user settings table (active character tracking)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_settings (
+                user_id TEXT PRIMARY KEY,
+                active_character_name TEXT DEFAULT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
 

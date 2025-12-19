@@ -130,6 +130,76 @@ async def find_character(user_id: str, character_name: str) -> Optional[Dict[str
         raise DatabaseError(f"Failed to find character: {e}")
 
 
+async def get_active_character(user_id: str) -> Optional[str]:
+    """
+    Get the user's active character name from user_settings.
+    Returns None if no active character is set.
+    """
+    try:
+        from core.db import get_async_db
+        async with get_async_db() as conn:
+            settings = await conn.fetchrow(
+                "SELECT active_character_name FROM user_settings WHERE user_id = $1",
+                user_id
+            )
+            return settings['active_character_name'] if settings else None
+    except Exception as e:
+        logger.error(f"Error getting active character for user {user_id}: {e}")
+        return None
+
+
+async def set_active_character(user_id: str, character_name: str) -> bool:
+    """
+    Set the user's active character in user_settings.
+    Returns True on success, False on failure.
+    """
+    try:
+        from core.db import get_async_db
+        async with get_async_db() as conn:
+            # Verify character exists first
+            char = await find_character(user_id, character_name)
+            if not char:
+                return False
+
+            # Use UPSERT pattern (INSERT ... ON CONFLICT UPDATE)
+            await conn.execute("""
+                INSERT INTO user_settings (user_id, active_character_name, updated_at)
+                VALUES ($1, $2, NOW())
+                ON CONFLICT (user_id)
+                DO UPDATE SET active_character_name = $2, updated_at = NOW()
+            """, user_id, char['name'])  # Use normalized name from character record
+
+            logger.info(f"Set active character for user {user_id}: {char['name']}")
+            return True
+    except Exception as e:
+        logger.error(f"Error setting active character for user {user_id}: {e}")
+        return False
+
+
+async def resolve_character(user_id: str, character_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """
+    Resolve character by name or use active character if name is not provided.
+
+    Args:
+        user_id: Discord user ID
+        character_name: Optional character name. If None, uses active character.
+
+    Returns:
+        Character dict if found, None otherwise.
+    """
+    # If character name provided, use it directly
+    if character_name:
+        return await find_character(user_id, character_name)
+
+    # Otherwise, try to get active character
+    active_name = await get_active_character(user_id)
+    if active_name:
+        return await find_character(user_id, active_name)
+
+    # No character name provided and no active character set
+    return None
+
+
 async def get_character_and_skills(user_id: str, character_name: str) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
     """
     Get character and skills with caching and enhanced error handling.
