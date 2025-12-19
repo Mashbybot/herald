@@ -39,6 +39,167 @@ def create_desperation_bar(desperation: int) -> str:
     return f"`[{filled}{empty}]` {desperation}/10"
 
 
+# ===== VIEW CLASSES =====
+
+class CreedSelectionView(discord.ui.View):
+    """Interactive button view for selecting Hunter Creed"""
+
+    def __init__(self, user_id: str, character_name: str, timeout: float = 60):
+        super().__init__(timeout=timeout)
+        self.user_id = user_id
+        self.character_name = character_name
+        self.selected_creed = None
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Ensure only the original user can interact"""
+        return str(interaction.user.id) == self.user_id
+
+    @discord.ui.button(label="Entrepreneurial", style=discord.ButtonStyle.primary, emoji="🔨")
+    async def entrepreneurial_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._set_creed(interaction, "Entrepreneurial", "Building, inventing, repairing")
+
+    @discord.ui.button(label="Faithful", style=discord.ButtonStyle.primary, emoji="✝️")
+    async def faithful_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._set_creed(interaction, "Faithful", "Direct conflict with the supernatural")
+
+    @discord.ui.button(label="Inquisitive", style=discord.ButtonStyle.primary, emoji="🔍")
+    async def inquisitive_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._set_creed(interaction, "Inquisitive", "Gaining information")
+
+    @discord.ui.button(label="Martial", style=discord.ButtonStyle.primary, emoji="⚔️")
+    async def martial_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._set_creed(interaction, "Martial", "Physical conflict")
+
+    @discord.ui.button(label="Underground", style=discord.ButtonStyle.primary, emoji="🎭")
+    async def underground_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._set_creed(interaction, "Underground", "Stealth and subterfuge")
+
+    async def _set_creed(self, interaction: discord.Interaction, creed: str, description: str):
+        """Set the character's creed"""
+        try:
+            from core.db import get_async_db
+            async with get_async_db() as conn:
+                await conn.execute(
+                    "UPDATE characters SET creed = $1 WHERE user_id = $2 AND name = $3",
+                    creed, self.user_id, self.character_name
+                )
+
+            embed = discord.Embed(
+                title=f"{HeraldEmojis.CREED} Creed Set",
+                description=f"**{self.character_name}'s Creed:** {creed}\n\n*{description}*",
+                color=0x8B0000
+            )
+            embed.set_footer(text="Use Desperation dice when your action aligns with your Creed Field")
+
+            # Disable all buttons
+            for item in self.children:
+                item.disabled = True
+
+            await interaction.response.edit_message(embed=embed, view=self)
+            self.selected_creed = creed
+            self.stop()
+
+        except Exception as e:
+            logger.error(f"Error setting creed: {e}")
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Error setting creed",
+                ephemeral=True
+            )
+
+
+class DriveSelectionView(discord.ui.View):
+    """Interactive button view for selecting Hunter Drive"""
+
+    DRIVE_REDEMPTIONS = {
+        "Curiosity": "Uncover new information about your quarry",
+        "Vengeance": "Hurt your quarry",
+        "Oath": "Actively uphold or fulfill your oath",
+        "Greed": "Acquire resources from enemies",
+        "Pride": "Best your quarry in some contest",
+        "Envy": "Ally with your quarry",
+        "Atonement": "Protect someone from your quarry"
+    }
+
+    def __init__(self, user_id: str, character_name: str, timeout: float = 60):
+        super().__init__(timeout=timeout)
+        self.user_id = user_id
+        self.character_name = character_name
+        self.selected_drive = None
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Ensure only the original user can interact"""
+        return str(interaction.user.id) == self.user_id
+
+    @discord.ui.button(label="Curiosity", style=discord.ButtonStyle.primary, emoji="🔍", row=0)
+    async def curiosity_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._set_drive(interaction, "Curiosity")
+
+    @discord.ui.button(label="Vengeance", style=discord.ButtonStyle.primary, emoji="⚔️", row=0)
+    async def vengeance_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._set_drive(interaction, "Vengeance")
+
+    @discord.ui.button(label="Oath", style=discord.ButtonStyle.primary, emoji="🤝", row=0)
+    async def oath_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._set_drive(interaction, "Oath")
+
+    @discord.ui.button(label="Greed", style=discord.ButtonStyle.primary, emoji="💰", row=1)
+    async def greed_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._set_drive(interaction, "Greed")
+
+    @discord.ui.button(label="Pride", style=discord.ButtonStyle.primary, emoji="👑", row=1)
+    async def pride_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._set_drive(interaction, "Pride")
+
+    @discord.ui.button(label="Envy", style=discord.ButtonStyle.primary, emoji="💚", row=1)
+    async def envy_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._set_drive(interaction, "Envy")
+
+    @discord.ui.button(label="Atonement", style=discord.ButtonStyle.primary, emoji="🕊️", row=2)
+    async def atonement_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._set_drive(interaction, "Atonement")
+
+    async def _set_drive(self, interaction: discord.Interaction, drive: str):
+        """Set the character's drive and redemption"""
+        try:
+            redemption = self.DRIVE_REDEMPTIONS[drive]
+
+            from core.db import get_async_db
+            async with get_async_db() as conn:
+                await conn.execute(
+                    "UPDATE characters SET drive = $1, redemption = $2 WHERE user_id = $3 AND name = $4",
+                    drive, redemption, self.user_id, self.character_name
+                )
+
+            embed = discord.Embed(
+                title=f"{HeraldEmojis.DRIVE} Drive Set",
+                description=f"**{self.character_name}'s Drive:** {drive}",
+                color=0x8B0000
+            )
+
+            embed.add_field(
+                name=f"{HeraldEmojis.REDEMPTION} Redemption",
+                value=redemption,
+                inline=False
+            )
+
+            embed.set_footer(text="Achieve your Redemption to recover from Despair")
+
+            # Disable all buttons
+            for item in self.children:
+                item.disabled = True
+
+            await interaction.response.edit_message(embed=embed, view=self)
+            self.selected_drive = drive
+            self.stop()
+
+        except Exception as e:
+            logger.error(f"Error setting drive: {e}")
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Error setting drive",
+                ephemeral=True
+            )
+
+
 class CharacterGameplay(commands.Cog):
     """Character Gameplay - H5E mechanics and combat systems"""
     
@@ -409,18 +570,15 @@ class CharacterGameplay(commands.Cog):
 
     @app_commands.command(name="creed", description="View or set your character's Hunter Creed")
     @app_commands.describe(
-        creed="Hunter Creed (leave empty to view current)",
+        action="View current creed or set a new one",
         character="Character name (optional - uses active character if not specified)"
     )
-    @app_commands.choices(creed=[
-        app_commands.Choice(name="Entrepreneurial - Building, inventing, repairing", value="Entrepreneurial"),
-        app_commands.Choice(name="Faithful - Direct conflict with the supernatural", value="Faithful"),
-        app_commands.Choice(name="Inquisitive - Gaining information", value="Inquisitive"),
-        app_commands.Choice(name="Martial - Physical conflict", value="Martial"),
-        app_commands.Choice(name="Underground - Stealth and subterfuge", value="Underground")
+    @app_commands.choices(action=[
+        app_commands.Choice(name="View", value="view"),
+        app_commands.Choice(name="Set", value="set")
     ])
     @app_commands.autocomplete(character=character_autocomplete)
-    async def creed(self, interaction: discord.Interaction, creed: str = None, character: str = None):
+    async def creed(self, interaction: discord.Interaction, action: str = "view", character: str = None):
         """Manage character Creed (Hunter type/philosophy)"""
 
         user_id = str(interaction.user.id)
@@ -435,8 +593,8 @@ class CharacterGameplay(commands.Cog):
                 )
                 return
 
-            # If no creed provided, show current
-            if creed is None:
+            if action == "view":
+                # Show current creed
                 current_creed = char['creed']
 
                 embed = discord.Embed(
@@ -470,30 +628,50 @@ class CharacterGameplay(commands.Cog):
                         inline=False
                     )
 
+                embed.set_footer(text="Use /creed action:Set to change your creed")
                 await interaction.response.send_message(embed=embed)
-                return
 
-            # Set the creed with async
-            async with get_async_db() as conn:
-                await conn.execute(
-                    "UPDATE characters SET creed = $1 WHERE user_id = $2 AND name = $3",
-                    creed, user_id, char['name']
+            else:  # action == "set"
+                # Show interactive button selection
+                embed = discord.Embed(
+                    title=f"{HeraldEmojis.CREED} Select Your Creed",
+                    description=f"Choose the Creed for **{char['name']}**\n\nYour Creed represents your Hunter's philosophy and approach to the hunt.",
+                    color=0x8B0000
                 )
 
-            embed = discord.Embed(
-                title=f"{HeraldEmojis.CREED} Creed Set",
-                description=f"**{char['name']}'s Creed:** {creed}",
-                color=0x8B0000
-            )
+                embed.add_field(
+                    name="🔨 Entrepreneurial",
+                    value="Building, inventing, repairing",
+                    inline=True
+                )
+                embed.add_field(
+                    name="✝️ Faithful",
+                    value="Direct conflict with the supernatural",
+                    inline=True
+                )
+                embed.add_field(
+                    name="🔍 Inquisitive",
+                    value="Gaining information",
+                    inline=True
+                )
+                embed.add_field(
+                    name="⚔️ Martial",
+                    value="Physical conflict",
+                    inline=True
+                )
+                embed.add_field(
+                    name="🎭 Underground",
+                    value="Stealth and subterfuge",
+                    inline=True
+                )
 
-            embed.set_footer(text="Use Desperation dice when your action aligns with your Creed Field")
-
-            await interaction.response.send_message(embed=embed)
+                view = CreedSelectionView(user_id, char['name'])
+                await interaction.response.send_message(embed=embed, view=view)
 
         except Exception as e:
-            self.logger.error(f"Error setting creed: {e}")
+            self.logger.error(f"Error in creed command: {e}")
             await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Error setting creed",
+                f"{HeraldEmojis.ERROR} Error managing creed",
                 ephemeral=True
             )
 
@@ -665,34 +843,18 @@ class CharacterGameplay(commands.Cog):
 
     @app_commands.command(name="drive", description="View or set your character's Drive and Redemption")
     @app_commands.describe(
-        drive="Your Drive (why you hunt) - leave empty to view current",
+        action="View current drive or set a new one",
         character="Character name (optional - uses active character if not specified)"
     )
-    @app_commands.choices(drive=[
-        app_commands.Choice(name="Curiosity - Uncover new information about your quarry", value="Curiosity"),
-        app_commands.Choice(name="Vengeance - Hurt your quarry", value="Vengeance"),
-        app_commands.Choice(name="Oath - Actively uphold or fulfill your oath", value="Oath"),
-        app_commands.Choice(name="Greed - Acquire resources from enemies", value="Greed"),
-        app_commands.Choice(name="Pride - Best your quarry in some contest", value="Pride"),
-        app_commands.Choice(name="Envy - Ally with your quarry", value="Envy"),
-        app_commands.Choice(name="Atonement - Protect someone from your quarry", value="Atonement")
+    @app_commands.choices(action=[
+        app_commands.Choice(name="View", value="view"),
+        app_commands.Choice(name="Set", value="set")
     ])
     @app_commands.autocomplete(character=character_autocomplete)
-    async def drive(self, interaction: discord.Interaction, drive: str = None, character: str = None):
+    async def drive(self, interaction: discord.Interaction, action: str = "view", character: str = None):
         """Manage character Drive (reason for hunting) and Redemption (healing from Despair)"""
 
         user_id = str(interaction.user.id)
-
-        # Drive-Redemption mappings from H5E
-        drive_redemptions = {
-            "Curiosity": "Uncover new information about your quarry",
-            "Vengeance": "Hurt your quarry",
-            "Oath": "Actively uphold or fulfill your oath",
-            "Greed": "Acquire resources from enemies",
-            "Pride": "Best your quarry in some contest",
-            "Envy": "Ally with your quarry",
-            "Atonement": "Protect someone from your quarry"
-        }
 
         try:
             char = await resolve_character(user_id, character)
@@ -704,11 +866,11 @@ class CharacterGameplay(commands.Cog):
                 )
                 return
 
-            current_drive = char['drive']
-            current_redemption = char['redemption']
+            if action == "view":
+                # Show current drive and redemption
+                current_drive = char['drive']
+                current_redemption = char['redemption']
 
-            # If no drive provided, show current drive and redemption
-            if drive is None:
                 embed = discord.Embed(
                     title=f"{HeraldEmojis.DRIVE} {char['name']}'s Drive",
                     color=0x8B0000
@@ -730,36 +892,58 @@ class CharacterGameplay(commands.Cog):
                         inline=False
                     )
 
+                embed.set_footer(text="Use /drive action:Set to change your drive")
                 await interaction.response.send_message(embed=embed)
-                return
 
-            # Set both drive and its associated redemption
-            redemption = drive_redemptions.get(drive, drive)
-
-            async with get_async_db() as conn:
-                await conn.execute(
-                    "UPDATE characters SET drive = $1, redemption = $2 WHERE user_id = $3 AND name = $4",
-                    drive, redemption, user_id, char['name']
+            else:  # action == "set"
+                # Show interactive button selection
+                embed = discord.Embed(
+                    title=f"{HeraldEmojis.DRIVE} Select Your Drive",
+                    description=f"Choose the Drive for **{char['name']}**\n\nYour Drive is why you hunt. Your Redemption is what you must do to escape Despair.",
+                    color=0x8B0000
                 )
 
-            embed = discord.Embed(
-                title=f"{HeraldEmojis.DRIVE} Drive Set",
-                description=f"**{char['name']}'s Drive:** {drive}",
-                color=0x8B0000
-            )
+                embed.add_field(
+                    name="🔍 Curiosity",
+                    value="*Redemption:* Uncover new information about your quarry",
+                    inline=False
+                )
+                embed.add_field(
+                    name="⚔️ Vengeance",
+                    value="*Redemption:* Hurt your quarry",
+                    inline=False
+                )
+                embed.add_field(
+                    name="🤝 Oath",
+                    value="*Redemption:* Actively uphold or fulfill your oath",
+                    inline=False
+                )
+                embed.add_field(
+                    name="💰 Greed",
+                    value="*Redemption:* Acquire resources from enemies",
+                    inline=False
+                )
+                embed.add_field(
+                    name="👑 Pride",
+                    value="*Redemption:* Best your quarry in some contest",
+                    inline=False
+                )
+                embed.add_field(
+                    name="💚 Envy",
+                    value="*Redemption:* Ally with your quarry",
+                    inline=False
+                )
+                embed.add_field(
+                    name="🕊️ Atonement",
+                    value="*Redemption:* Protect someone from your quarry",
+                    inline=False
+                )
 
-            embed.add_field(
-                name=f"{HeraldEmojis.REDEMPTION} Redemption",
-                value=redemption,
-                inline=False
-            )
-
-            embed.set_footer(text="Achieve your Redemption to recover from Despair")
-
-            await interaction.response.send_message(embed=embed)
+                view = DriveSelectionView(user_id, char['name'])
+                await interaction.response.send_message(embed=embed, view=view)
 
         except Exception as e:
-            self.logger.error(f"Error setting drive: {e}")
+            self.logger.error(f"Error in drive command: {e}")
             await interaction.response.send_message(
                 f"{HeraldEmojis.ERROR} Error setting drive",
                 ephemeral=True
