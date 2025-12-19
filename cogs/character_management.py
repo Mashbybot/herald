@@ -433,30 +433,51 @@ class CharacterManagement(commands.Cog):
         user_id = str(interaction.user.id)
         
         try:
-            
             async with get_async_db() as conn:
                 characters = await conn.fetch(
                     "SELECT name FROM characters WHERE user_id = $1 ORDER BY name",
                     user_id
                 )
-            
+
             if not characters:
                 await interaction.response.send_message(
-                    "📝 You don't have any characters yet. Use `/create` to make one!", 
+                    "📝 You don't have any characters yet. Use `/create` to make one!",
                     ephemeral=True
                 )
                 return
-            
-            # Convert asyncpg Records to list of character names
-            char_list = "\n".join([f"• {char['name']}" for char in characters])
+
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+
+            # Build character list with active indicator
+            char_list = []
+            for char in characters:
+                if active_char_name and char['name'] == active_char_name:
+                    char_list.append(f"🔸 **{char['name']}** (Active)")
+                else:
+                    char_list.append(f"• {char['name']}")
 
             embed = discord.Embed(
-                title="🔸 Active Hunters",
-                description=char_list,
+                title="🔸 Your Hunters",
+                description="\n".join(char_list),
                 color=HeraldColors.ORANGE
             )
+
+            if active_char_name:
+                embed.add_field(
+                    name="💡 Tip",
+                    value="Commands will default to your active character. Use `/character` to switch.",
+                    inline=False
+                )
+            else:
+                embed.add_field(
+                    name="💡 Tip",
+                    value="Set an active character with `/character` to skip typing character names!",
+                    inline=False
+                )
+
             embed.set_footer(text="Use /sheet <name> to view a character sheet")
-            
+
             await interaction.response.send_message(embed=embed, ephemeral=True)
             
         except Exception as e:

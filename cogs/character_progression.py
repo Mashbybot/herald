@@ -132,43 +132,40 @@ class CharacterProgression(commands.Cog):
 
     @app_commands.command(name="skill_set", description="Set dots for a skill on your character")
     @app_commands.describe(
-        character_name="Character name",
         skill="Skill to update",
-        dots="Skill rating (0-5)"
+        dots="Skill rating (0-5)",
+        character_name="Character name (optional - uses active character if not specified)"
     )
     @app_commands.choices(skill=[
         app_commands.Choice(name=skill, value=skill)
         for skill in ALL_SKILLS[:25]  # Discord limit
     ])
+    @app_commands.autocomplete(character_name=character_autocomplete)
     async def skill_set(
         self,
         interaction: discord.Interaction,
-        character_name: str,
         skill: str,
         dots: int,
+        character_name: str = None
     ):
         """Set skill dots for a character"""
         user_id = str(interaction.user.id)
         dots = max(0, min(dots, 5))  # Clamp to valid range
 
         try:
-            async with get_async_db() as conn:
-                # Verify character exists
-                char = await conn.fetchrow(
-                    "SELECT name FROM characters WHERE user_id = $1 AND name = $2",
-                    user_id, character_name
-                )
-                
-                if not char:
-                    await interaction.response.send_message(
-                        f"⚠️ No character named **{character_name}** found", 
-                        ephemeral=True
-                    )
-                    return
+            char = await resolve_character(user_id, character_name)
 
+            if not char:
+                await interaction.response.send_message(
+                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
+                return
+
+            async with get_async_db() as conn:
                 # Update skill
                 await conn.execute("""
-                    UPDATE skills 
+                    UPDATE skills
                     SET dots = $1
                     WHERE user_id = $2 AND character_name = $3 AND skill_name = $4
                 """, dots, user_id, char['name'], skill)
@@ -192,15 +189,16 @@ class CharacterProgression(commands.Cog):
 
     @app_commands.command(name="skill_template", description="Apply a pre-made skill distribution template")
     @app_commands.describe(
-        character="Character name",
-        template="Skill distribution template to apply"
+        template="Skill distribution template to apply",
+        character="Character name (optional - uses active character if not specified)"
     )
     @app_commands.choices(template=[
         app_commands.Choice(name="Balanced (Jack of All Trades)", value="balanced"),
         app_commands.Choice(name="Specialized (Expert Focus)", value="specialized"),
         app_commands.Choice(name="Generalist (Broad Knowledge)", value="generalist")
     ])
-    async def skill_template(self, interaction: discord.Interaction, character: str, template: str):
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def skill_template(self, interaction: discord.Interaction, template: str, character: str = None):
         """Apply a skill distribution template"""
         user_id = str(interaction.user.id)
         
@@ -227,18 +225,17 @@ class CharacterProgression(commands.Cog):
         if not template_info:
             await interaction.response.send_message("❌ Invalid template", ephemeral=True)
             return
-        
+
         try:
-            # Use fuzzy character matching
-            char = await find_character(user_id, character)
-            
+            char = await resolve_character(user_id, character)
+
             if not char:
                 await interaction.response.send_message(
-                    f"⚠️ No character named **{character}** found", 
+                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
                     ephemeral=True
                 )
                 return
-            
+
             # Create confirmation view
             embed = discord.Embed(
                 title=f"📋 Apply {template_info['name']} Template?",
@@ -270,10 +267,11 @@ class CharacterProgression(commands.Cog):
 
     @app_commands.command(name="skill_bulk", description="Set multiple skills at once")
     @app_commands.describe(
-        character="Character name",
-        skill_list="Comma-separated skill:dots pairs (e.g., 'Athletics:3,Stealth:2,Investigation:4')"
+        skill_list="Comma-separated skill:dots pairs (e.g., 'Athletics:3,Stealth:2,Investigation:4')",
+        character="Character name (optional - uses active character if not specified)"
     )
-    async def skill_bulk(self, interaction: discord.Interaction, character: str, skill_list: str):
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def skill_bulk(self, interaction: discord.Interaction, skill_list: str, character: str = None):
         """Bulk set multiple skills"""
         user_id = str(interaction.user.id)
         
@@ -295,21 +293,20 @@ class CharacterProgression(commands.Cog):
             
             if not skill_updates:
                 await interaction.response.send_message(
-                    "❌ Invalid format. Use: 'Skill1:dots,Skill2:dots' (e.g., 'Athletics:3,Stealth:2')", 
+                    "❌ Invalid format. Use: 'Skill1:dots,Skill2:dots' (e.g., 'Athletics:3,Stealth:2')",
                     ephemeral=True
                 )
                 return
-            
-            # Use fuzzy character matching
-            char = await find_character(user_id, character)
-            
+
+            char = await resolve_character(user_id, character)
+
             if not char:
                 await interaction.response.send_message(
-                    f"⚠️ No character named **{character}** found", 
+                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
                     ephemeral=True
                 )
                 return
-            
+
             async with get_async_db() as conn:
                 # Validate all skills exist and update them
                 updated_skills = []
@@ -378,34 +375,34 @@ class CharacterProgression(commands.Cog):
 
     @app_commands.command(name="specialty", description="Manage skill specialties")
     @app_commands.describe(
-        character="Character name",
         action="What to do with specialty",
         skill="Skill name (for add/remove actions)",
-        specialty="Specialty name (for add/remove actions)"
+        specialty="Specialty name (for add/remove actions)",
+        character="Character name (optional - uses active character if not specified)"
     )
     @app_commands.choices(action=[
         app_commands.Choice(name="View All", value="view"),
         app_commands.Choice(name="Add", value="add"),
         app_commands.Choice(name="Remove", value="remove")
     ])
+    @app_commands.autocomplete(character=character_autocomplete)
     async def specialty(
         self,
         interaction: discord.Interaction,
-        character: str,
         action: str,
         skill: str = None,
-        specialty: str = None
+        specialty: str = None,
+        character: str = None
     ):
         """Manage character skill specialties"""
         user_id = str(interaction.user.id)
-        
+
         try:
-            # Use fuzzy character matching
-            char = await find_character(user_id, character)
-            
+            char = await resolve_character(user_id, character)
+
             if not char:
                 await interaction.response.send_message(
-                    f"⚠️ No character named **{character}** found", 
+                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
                     ephemeral=True
                 )
                 return
@@ -560,13 +557,14 @@ class CharacterProgression(commands.Cog):
 
     @app_commands.command(name="specialty_bulk", description="Add multiple specialties at once")
     @app_commands.describe(
-        character="Character name",
-        specialty_list="Comma-separated skill:specialty pairs (e.g., 'Athletics:Running,Firearms:Pistols')"
+        specialty_list="Comma-separated skill:specialty pairs (e.g., 'Athletics:Running,Firearms:Pistols')",
+        character="Character name (optional - uses active character if not specified)"
     )
-    async def specialty_bulk(self, interaction: discord.Interaction, character: str, specialty_list: str):
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def specialty_bulk(self, interaction: discord.Interaction, specialty_list: str, character: str = None):
         """Bulk add multiple specialties"""
         user_id = str(interaction.user.id)
-        
+
         try:
             # Parse specialty updates
             specialty_updates = []
@@ -579,20 +577,19 @@ class CharacterProgression(commands.Cog):
                 specialty_name = specialty_name.strip()
                 if skill_name and specialty_name:
                     specialty_updates.append((skill_name, specialty_name))
-            
+
             if not specialty_updates:
                 await interaction.response.send_message(
-                    "❌ Invalid format. Use: 'Skill1:Specialty1,Skill2:Specialty2' (e.g., 'Athletics:Running,Firearms:Pistols')", 
+                    "❌ Invalid format. Use: 'Skill1:Specialty1,Skill2:Specialty2' (e.g., 'Athletics:Running,Firearms:Pistols')",
                     ephemeral=True
                 )
                 return
-            
-            # Use fuzzy character matching
-            char = await find_character(user_id, character)
-            
+
+            char = await resolve_character(user_id, character)
+
             if not char:
                 await interaction.response.send_message(
-                    f"⚠️ No character named **{character}** found", 
+                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
                     ephemeral=True
                 )
                 return
@@ -701,10 +698,10 @@ class CharacterProgression(commands.Cog):
 
     @app_commands.command(name="xp", description="View or manage your character's experience points")
     @app_commands.describe(
-        character="Character name",
         action="What to do with experience points",
         amount="Amount of XP to add/subtract/set (optional for 'view')",
-        reason="Reason for XP change (optional)"
+        reason="Reason for XP change (optional)",
+        character="Character name (optional - uses active character if not specified)"
     )
     @app_commands.choices(action=[
         app_commands.Choice(name="View", value="view"),
@@ -712,24 +709,24 @@ class CharacterProgression(commands.Cog):
         app_commands.Choice(name="Subtract", value="subtract"),
         app_commands.Choice(name="Set", value="set")
     ])
+    @app_commands.autocomplete(character=character_autocomplete)
     async def experience_points(
-        self, 
-        interaction: discord.Interaction, 
-        character: str, 
-        action: str, 
-        amount: int = None, 
-        reason: str = None
+        self,
+        interaction: discord.Interaction,
+        action: str,
+        amount: int = None,
+        reason: str = None,
+        character: str = None
     ):
         """Manage character experience points"""
         user_id = str(interaction.user.id)
-        
+
         try:
-            # Use fuzzy character matching
-            char = await find_character(user_id, character)
-            
+            char = await resolve_character(user_id, character)
+
             if not char:
                 await interaction.response.send_message(
-                    f"⚠️ No character named **{character}** found", 
+                    f"❌ No character specified and no active character set. Use `/character` to set your active character.", 
                     ephemeral=True
                 )
                 return
@@ -881,10 +878,10 @@ class CharacterProgression(commands.Cog):
 
     @app_commands.command(name="spend_xp", description="Spend XP to improve attributes or skills")
     @app_commands.describe(
-        character="Character name",
         improvement_type="What to improve",
         target="Attribute or skill name",
-        new_rating="New rating (current rating + 1)"
+        new_rating="New rating (current rating + 1)",
+        character="Character name (optional - uses active character if not specified)"
     )
     @app_commands.choices(
         improvement_type=[
@@ -892,31 +889,31 @@ class CharacterProgression(commands.Cog):
             app_commands.Choice(name="Skill", value="skill")
         ]
     )
+    @app_commands.autocomplete(character=character_autocomplete)
     async def spend_xp(
         self,
         interaction: discord.Interaction,
-        character: str,
         improvement_type: str,
         target: str,
-        new_rating: int
+        new_rating: int,
+        character: str = None
     ):
         """Spend XP to improve character abilities"""
         user_id = str(interaction.user.id)
-        
+
         if new_rating < 1 or new_rating > 5:
             await interaction.response.send_message(
-                "❌ Ratings must be between 1 and 5", 
+                "❌ Ratings must be between 1 and 5",
                 ephemeral=True
             )
             return
-        
+
         try:
-            # Use fuzzy character matching
-            char = await find_character(user_id, character)
-            
+            char = await resolve_character(user_id, character)
+
             if not char:
                 await interaction.response.send_message(
-                    f"⚠️ No character named **{character}** found", 
+                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
                     ephemeral=True
                 )
                 return
@@ -1094,27 +1091,27 @@ class CharacterProgression(commands.Cog):
 
     @app_commands.command(name="xp_log", description="View your character's experience point history")
     @app_commands.describe(
-        character="Character name",
-        limit="Number of recent entries to show (default: 10)"
+        limit="Number of recent entries to show (default: 10)",
+        character="Character name (optional - uses active character if not specified)"
     )
-    async def xp_log(self, interaction: discord.Interaction, character: str, limit: int = 10):
+    @app_commands.autocomplete(character=character_autocomplete)
+    async def xp_log(self, interaction: discord.Interaction, limit: int = 10, character: str = None):
         """View character's XP transaction log"""
         user_id = str(interaction.user.id)
-        
+
         if limit < 1 or limit > 50:
             await interaction.response.send_message(
-                "❌ Limit must be between 1 and 50", 
+                "❌ Limit must be between 1 and 50",
                 ephemeral=True
             )
             return
-        
+
         try:
-            # Use fuzzy character matching
-            char = await find_character(user_id, character)
-            
+            char = await resolve_character(user_id, character)
+
             if not char:
                 await interaction.response.send_message(
-                    f"⚠️ No character named **{character}** found", 
+                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
                     ephemeral=True
                 )
                 return

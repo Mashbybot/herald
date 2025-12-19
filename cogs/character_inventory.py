@@ -11,7 +11,7 @@ from typing import List
 import logging
 
 from core.db import get_async_db
-from core.character_utils import find_character, character_autocomplete
+from core.character_utils import find_character, character_autocomplete, resolve_character
 from config.settings import GUILD_ID
 
 logger = logging.getLogger('Herald.Character.Inventory')
@@ -156,10 +156,10 @@ class CharacterInventory(commands.Cog):
 
     @app_commands.command(name="equipment", description="Manage your character's equipment")
     @app_commands.describe(
-        character="Character name",
         action="What to do with equipment",
         item="Item name (required for add/remove)",
-        description="Item description (optional for add)"
+        description="Item description (optional for add)",
+        character="Character name (optional - uses active character if not specified)"
     )
     @app_commands.choices(action=[
         app_commands.Choice(name="View", value="view"),
@@ -167,22 +167,26 @@ class CharacterInventory(commands.Cog):
         app_commands.Choice(name="Remove", value="remove"),
         app_commands.Choice(name="Clear All", value="clear")
     ])
+    @app_commands.autocomplete(character=character_autocomplete)
     async def equipment(
         self,
         interaction: discord.Interaction,
-        character: str,
         action: str,
         item: str = None,
-        description: str = None
+        description: str = None,
+        character: str = None
     ):
         """Manage character equipment"""
         user_id = str(interaction.user.id)
-        
+
         try:
-            char = await find_character(user_id, character)
-            
+            char = await resolve_character(user_id, character)
+
             if not char:
-                await interaction.response.send_message(f"⚠️ No character named **{character}** found", ephemeral=True)
+                await interaction.response.send_message(
+                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
                 return
             
             if action == "view":
@@ -342,10 +346,10 @@ class CharacterInventory(commands.Cog):
 
     @app_commands.command(name="notes", description="Manage character notes and journal entries")
     @app_commands.describe(
-        character="Character name",
         action="What to do with notes",
         title="Note title (required for add)",
-        content="Note content (required for add)"
+        content="Note content (required for add)",
+        character="Character name (optional - uses active character if not specified)"
     )
     @app_commands.choices(action=[
         app_commands.Choice(name="View All", value="view"),
@@ -353,22 +357,26 @@ class CharacterInventory(commands.Cog):
         app_commands.Choice(name="Remove", value="remove"),
         app_commands.Choice(name="Clear All", value="clear")
     ])
+    @app_commands.autocomplete(character=character_autocomplete)
     async def notes(
         self,
         interaction: discord.Interaction,
-        character: str,
         action: str,
         title: str = None,
-        content: str = None
+        content: str = None,
+        character: str = None
     ):
         """Manage character notes and journal entries"""
         user_id = str(interaction.user.id)
-        
+
         try:
-            char = await find_character(user_id, character)
-            
+            char = await resolve_character(user_id, character)
+
             if not char:
-                await interaction.response.send_message(f"⚠️ No character named **{character}** found", ephemeral=True)
+                await interaction.response.send_message(
+                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
                 return
             
             if action == "view":
