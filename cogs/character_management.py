@@ -45,17 +45,14 @@ class CharacterSelectionView(discord.ui.View):
             char_name = char['name']
             # Use different style for active character
             is_active = active_character_name and char_name == active_character_name
-            style = discord.ButtonStyle.success if is_active else discord.ButtonStyle.primary
+            style = discord.ButtonStyle.success if is_active else discord.ButtonStyle.secondary
             label = f"{char_name}" + (" (Active)" if is_active else "")
 
-            # Create button with emoji based on position
-            emojis = ["1️⃣", "2️⃣", "3️⃣"]
-            emoji = emojis[i] if i < len(emojis) else "🔸"
-
+            # All buttons use Herald's orange diamond emoji
             button = discord.ui.Button(
                 label=label,
                 style=style,
-                emoji=emoji,
+                emoji="🔸",
                 custom_id=f"char_{i}"
             )
             button.callback = self._create_callback(char_name)
