@@ -482,24 +482,30 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         embed.set_author(name=f"🔸 Hunter Dossier: {name}")
 
         # === CREED/DRIVE/DESIRE/AMBITION (Vertical list) ===
+        # Format values in code blocks when data is present (like Inconnu)
+        creed_display = f"`{creed}`" if creed != '[No Data Available]' else creed
+        drive_display = f"`{drive}`" if drive != '[No Data Available]' else drive
+        desire_display = f"`{desire}`" if desire != '[No Data Available]' else desire
+        ambition_display = f"`{ambition}`" if ambition != '[No Data Available]' else ambition
+
         embed.add_field(
             name="\u200b",
-            value=f"**Creed:** {creed}",
+            value=f"**Creed:** {creed_display}",
             inline=False
         )
         embed.add_field(
             name="\u200b",
-            value=f"**Drive:** {drive}",
+            value=f"**Drive:** {drive_display}",
             inline=False
         )
         embed.add_field(
             name="\u200b",
-            value=f"**Desire:** {desire}",
+            value=f"**Desire:** {desire_display}",
             inline=False
         )
         embed.add_field(
             name="\u200b",
-            value=f"**Ambition:** {ambition}",
+            value=f"**Ambition:** {ambition_display}",
             inline=False
         )
 
