@@ -531,28 +531,27 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         danger = max(0, min(10, character.get('danger', 0)))
         danger_bar = create_danger_bar(danger)
 
-        # Display trackers in 2x2 layout
-        # Note: Using 2 fields per row (no spacer) gives each field 50% width to prevent wrapping
+        # Display trackers in vertical list format
+        # Each tracker on its own row with header inline and aligned dots
         embed.add_field(
-            name="__Health__",
-            value=f"{health_bar}\n`{health_remaining}/{health_current}`",
-            inline=True
+            name="\u200b",
+            value=f"**Health:**\u2003\u2003\u2003{health_bar} `{health_remaining}/{health_current}`",
+            inline=False
         )
         embed.add_field(
-            name="__Willpower__",
-            value=f"{willpower_bar}\n`{willpower_remaining}/{willpower_current}`",
-            inline=True
-        )
-
-        embed.add_field(
-            name="__Desperation__",
-            value=f"{desperation_bar}\n`{desperation}/10`",
-            inline=True
+            name="\u200b",
+            value=f"**Willpower:**\u2003{willpower_bar} `{willpower_remaining}/{willpower_current}`",
+            inline=False
         )
         embed.add_field(
-            name="__Danger__",
-            value=f"{danger_bar}\n`{danger}/10`",
-            inline=True
+            name="\u200b",
+            value=f"**Desperation:** {desperation_bar} `{desperation}/10`",
+            inline=False
+        )
+        embed.add_field(
+            name="\u200b",
+            value=f"**Danger:**\u2003\u2003\u2003{danger_bar} `{danger}/10`",
+            inline=False
         )
 
         # Show Despair State if active
