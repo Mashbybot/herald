@@ -76,7 +76,7 @@ class HeraldEmojis:
     SUCCESS_DIE = "🎯"
     
     # Visual Separators
-    SEPARATOR = "🟨⬛🟨⬛🟨⬛🟨⬛🟨⬛🟨⬛🟨⬛🟨⬛🟨⬛🟨⬛🟨⬛"  # Warning tape style
+    SEPARATOR = "━━━━━━━━━━━━━━━━━━━━━━━"
     DIVIDER = "▫️"
     
     # === DICE EMOJIS (Easy to customize) ===
