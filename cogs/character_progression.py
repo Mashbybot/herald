@@ -10,7 +10,7 @@ from typing import List
 import logging
 
 from core.db import get_async_db
-from core.character_utils import find_character, character_autocomplete, ALL_SKILLS, resolve_character
+from core.character_utils import find_character, character_autocomplete, ALL_SKILLS, resolve_character, get_active_character
 from core.ui_utils import HeraldColors, HeraldMessages
 from config.settings import GUILD_ID
 
@@ -189,16 +189,13 @@ class CharacterProgression(commands.Cog):
 
     @app_commands.command(name="skill_template", description="Apply a pre-made skill distribution template")
     @app_commands.describe(
-        template="Skill distribution template to apply",
-        character="Character name (optional - uses active character if not specified)"
-    )
+        template="Skill distribution template to apply"    )
     @app_commands.choices(template=[
         app_commands.Choice(name="Balanced (Jack of All Trades)", value="balanced"),
         app_commands.Choice(name="Specialized (Expert Focus)", value="specialized"),
         app_commands.Choice(name="Generalist (Broad Knowledge)", value="generalist")
     ])
-    @app_commands.autocomplete(character=character_autocomplete)
-    async def skill_template(self, interaction: discord.Interaction, template: str, character: str = None):
+    async def skill_template(self, interaction: discord.Interaction, template: str):
         """Apply a skill distribution template"""
         user_id = str(interaction.user.id)
         
@@ -227,11 +224,19 @@ class CharacterProgression(commands.Cog):
             return
 
         try:
-            char = await resolve_character(user_id, character)
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"❌ No active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
+                return
 
+            char = await find_character(user_id, active_char_name)
             if not char:
                 await interaction.response.send_message(
-                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
+                    f"❌ Could not find your active character.",
                     ephemeral=True
                 )
                 return
@@ -267,11 +272,8 @@ class CharacterProgression(commands.Cog):
 
     @app_commands.command(name="skill_bulk", description="Set multiple skills at once")
     @app_commands.describe(
-        skill_list="Comma-separated skill:dots pairs (e.g., 'Athletics:3,Stealth:2,Investigation:4')",
-        character="Character name (optional - uses active character if not specified)"
-    )
-    @app_commands.autocomplete(character=character_autocomplete)
-    async def skill_bulk(self, interaction: discord.Interaction, skill_list: str, character: str = None):
+        skill_list="Comma-separated skill:dots pairs (e.g., 'Athletics:3,Stealth:2,Investigation:4')"    )
+    async def skill_bulk(self, interaction: discord.Interaction, skill_list: str):
         """Bulk set multiple skills"""
         user_id = str(interaction.user.id)
         
@@ -298,11 +300,19 @@ class CharacterProgression(commands.Cog):
                 )
                 return
 
-            char = await resolve_character(user_id, character)
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"❌ No active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
+                return
 
+            char = await find_character(user_id, active_char_name)
             if not char:
                 await interaction.response.send_message(
-                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
+                    f"❌ Could not find your active character.",
                     ephemeral=True
                 )
                 return
@@ -377,15 +387,12 @@ class CharacterProgression(commands.Cog):
     @app_commands.describe(
         action="What to do with specialty",
         skill="Skill name (for add/remove actions)",
-        specialty="Specialty name (for add/remove actions)",
-        character="Character name (optional - uses active character if not specified)"
-    )
+        specialty="Specialty name (for add/remove actions)"    )
     @app_commands.choices(action=[
         app_commands.Choice(name="View All", value="view"),
         app_commands.Choice(name="Add", value="add"),
         app_commands.Choice(name="Remove", value="remove")
     ])
-    @app_commands.autocomplete(character=character_autocomplete)
     async def specialty(
         self,
         interaction: discord.Interaction,
@@ -398,11 +405,19 @@ class CharacterProgression(commands.Cog):
         user_id = str(interaction.user.id)
 
         try:
-            char = await resolve_character(user_id, character)
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"❌ No active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
+                return
 
+            char = await find_character(user_id, active_char_name)
             if not char:
                 await interaction.response.send_message(
-                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
+                    f"❌ Could not find your active character.",
                     ephemeral=True
                 )
                 return
@@ -557,11 +572,8 @@ class CharacterProgression(commands.Cog):
 
     @app_commands.command(name="specialty_bulk", description="Add multiple specialties at once")
     @app_commands.describe(
-        specialty_list="Comma-separated skill:specialty pairs (e.g., 'Athletics:Running,Firearms:Pistols')",
-        character="Character name (optional - uses active character if not specified)"
-    )
-    @app_commands.autocomplete(character=character_autocomplete)
-    async def specialty_bulk(self, interaction: discord.Interaction, specialty_list: str, character: str = None):
+        specialty_list="Comma-separated skill:specialty pairs (e.g., 'Athletics:Running,Firearms:Pistols')"    )
+    async def specialty_bulk(self, interaction: discord.Interaction, specialty_list: str):
         """Bulk add multiple specialties"""
         user_id = str(interaction.user.id)
 
@@ -585,11 +597,19 @@ class CharacterProgression(commands.Cog):
                 )
                 return
 
-            char = await resolve_character(user_id, character)
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"❌ No active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
+                return
 
+            char = await find_character(user_id, active_char_name)
             if not char:
                 await interaction.response.send_message(
-                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
+                    f"❌ Could not find your active character.",
                     ephemeral=True
                 )
                 return
@@ -700,16 +720,13 @@ class CharacterProgression(commands.Cog):
     @app_commands.describe(
         action="What to do with experience points",
         amount="Amount of XP to add/subtract/set (optional for 'view')",
-        reason="Reason for XP change (optional)",
-        character="Character name (optional - uses active character if not specified)"
-    )
+        reason="Reason for XP change (optional)"    )
     @app_commands.choices(action=[
         app_commands.Choice(name="View", value="view"),
         app_commands.Choice(name="Add", value="add"),
         app_commands.Choice(name="Subtract", value="subtract"),
         app_commands.Choice(name="Set", value="set")
     ])
-    @app_commands.autocomplete(character=character_autocomplete)
     async def experience_points(
         self,
         interaction: discord.Interaction,
@@ -880,16 +897,13 @@ class CharacterProgression(commands.Cog):
     @app_commands.describe(
         improvement_type="What to improve",
         target="Attribute or skill name",
-        new_rating="New rating (current rating + 1)",
-        character="Character name (optional - uses active character if not specified)"
-    )
+        new_rating="New rating (current rating + 1)"    )
     @app_commands.choices(
         improvement_type=[
             app_commands.Choice(name="Attribute", value="attribute"),
             app_commands.Choice(name="Skill", value="skill")
         ]
     )
-    @app_commands.autocomplete(character=character_autocomplete)
     async def spend_xp(
         self,
         interaction: discord.Interaction,
@@ -909,11 +923,19 @@ class CharacterProgression(commands.Cog):
             return
 
         try:
-            char = await resolve_character(user_id, character)
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"❌ No active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
+                return
 
+            char = await find_character(user_id, active_char_name)
             if not char:
                 await interaction.response.send_message(
-                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
+                    f"❌ Could not find your active character.",
                     ephemeral=True
                 )
                 return
@@ -1091,11 +1113,8 @@ class CharacterProgression(commands.Cog):
 
     @app_commands.command(name="xp_log", description="View your character's experience point history")
     @app_commands.describe(
-        limit="Number of recent entries to show (default: 10)",
-        character="Character name (optional - uses active character if not specified)"
-    )
-    @app_commands.autocomplete(character=character_autocomplete)
-    async def xp_log(self, interaction: discord.Interaction, limit: int = 10, character: str = None):
+        limit="Number of recent entries to show (default: 10)"    )
+    async def xp_log(self, interaction: discord.Interaction, limit: int = 10):
         """View character's XP transaction log"""
         user_id = str(interaction.user.id)
 
@@ -1107,11 +1126,19 @@ class CharacterProgression(commands.Cog):
             return
 
         try:
-            char = await resolve_character(user_id, character)
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"❌ No active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
+                return
 
+            char = await find_character(user_id, active_char_name)
             if not char:
                 await interaction.response.send_message(
-                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
+                    f"❌ Could not find your active character.",
                     ephemeral=True
                 )
                 return

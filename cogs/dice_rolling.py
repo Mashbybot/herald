@@ -15,7 +15,8 @@ from core.dice_utils import (
     create_success_description, format_margin_display, sort_dice_for_display
 )
 from core.character_utils import (
-    find_character, character_autocomplete, get_character_attribute, get_character_skill, ALL_SKILLS
+    find_character, character_autocomplete, get_character_attribute, get_character_skill,
+    get_active_character, ALL_SKILLS
 )
 from core.ui_utils import HeraldEmojis, HeraldMessages, HeraldColors
 from core.db import get_async_db
@@ -234,127 +235,6 @@ class DiceRolling(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="roll_char", description="Roll dice using character stats")
-    @app_commands.describe(
-        character="Character name",
-        attribute="Attribute to use",
-        skill="Skill to use",
-        difficulty="Target number of successes needed",
-        use_desperation="Use Desperation dice (aligned with Drive)",
-        modifier="Additional dice pool modifier"
-    )
-    @app_commands.choices(
-        attribute=[app_commands.Choice(name=attr, value=attr.lower()) for attr in H5E_ATTRIBUTES],
-        skill=[app_commands.Choice(name=skill, value=skill) for skill in ALL_SKILLS[:25]],  # Discord limit
-        difficulty=[
-            app_commands.Choice(name="Difficulty 0 (Automatic)", value=0),
-            app_commands.Choice(name="Difficulty 1 (Simple)", value=1),
-            app_commands.Choice(name="Difficulty 2 (Standard)", value=2),
-            app_commands.Choice(name="Difficulty 3 (Hard)", value=3),
-            app_commands.Choice(name="Difficulty 4 (Extreme)", value=4),
-            app_commands.Choice(name="Difficulty 5 (Nearly Impossible)", value=5),
-            app_commands.Choice(name="Difficulty 6 (Legendary)", value=6)
-        ]
-    )
-    async def roll_character(
-        self,
-        interaction: discord.Interaction,
-        character: str,
-        attribute: str,
-        skill: str = None,
-        difficulty: int = 0,
-        use_desperation: bool = False,
-        modifier: int = 0
-    ):
-        """Roll dice using character attributes and skills"""
-        user_id = str(interaction.user.id)
-
-        try:
-            # Find character
-            char = await find_character(user_id, character)
-            if not char:
-                error_msg = await HeraldMessages.character_not_found(user_id, character)
-                await interaction.response.send_message(error_msg, ephemeral=True)
-                return
-
-            # Get attribute value
-            attr_value = 0
-            if attribute:
-                attr_value = char.get(attribute, 0)
-                if attr_value is None:
-                    attr_value = 0
-
-            # Get skill value
-            skill_value = 0
-            if skill:
-                skill_value = await get_character_skill(user_id, char['name'], skill)
-                if skill_value is None:
-                    skill_value = 0
-
-            # Use character's danger rating automatically
-            char_danger = char.get('danger', 0) or 0
-            total_difficulty = difficulty + char_danger
-
-            # Check Despair state and Desperation dice
-            in_despair = char.get('in_despair', False) or False
-            char_desperation = char.get('desperation', 0) or 0
-            desperation_dice = 0
-
-            if use_desperation:
-                if in_despair:
-                    # Cannot use Desperation dice when in Despair
-                    await interaction.response.send_message(
-                        f"{HeraldEmojis.ERROR} **{char['name']}** is in Despair!\n"
-                        f"💀 Drive is unusable until redeemed.\n"
-                        f"🕊️ Redemption: {char.get('redemption', 'Not set')}",
-                        ephemeral=True
-                    )
-                    return
-                elif char_desperation > 0:
-                    # Use character's Desperation rating as Desperation dice
-                    desperation_dice = char_desperation
-                else:
-                    await interaction.response.send_message(
-                        f"{HeraldEmojis.ERROR} {char['name']} has no Desperation to use!",
-                        ephemeral=True
-                    )
-                    return
-
-            # Roll the dice
-            result = roll_pool(attr_value, skill_value, desperation_dice, 0)
-
-            # Create description
-            pool_parts = []
-            if attr_value > 0:
-                pool_parts.append(f"{attribute.title()} {attr_value}")
-            if skill_value > 0:
-                pool_parts.append(f"{skill} {skill_value}")
-            if modifier != 0:
-                pool_parts.append(f"Modifier {modifier:+d}")
-            if desperation_dice > 0:
-                pool_parts.append(f"Desperation {desperation_dice}")
-            
-            effective_pool = max(1, attr_value + skill_value + modifier)
-            description = " + ".join(pool_parts) + f" = {effective_pool} dice"
-            
-            if total_difficulty > 0:
-                description += f" vs Difficulty {total_difficulty}"
-                if char_danger > 0:
-                    description += f" ({difficulty} + {char_danger} Danger)"
-            
-            # Format and send result with character danger
-            embed = format_dice_result(result, description, char['name'], total_difficulty, char_danger)
-            await interaction.response.send_message(embed=embed)
-            
-            logger.info(f"Character roll for {char['name']}: {description} -> {result.total_successes} successes")
-            
-        except Exception as e:
-            logger.error(f"Error in roll_char command: {e}")
-            await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Error rolling for character: {str(e)}", 
-                ephemeral=True
-            )
-
     @app_commands.command(name="simple", description="Roll a simple dice pool")
     @app_commands.describe(
         pool="Number of dice to roll",
@@ -399,27 +279,21 @@ class DiceRolling(commands.Cog):
             )
 
     @app_commands.command(name="rouse", description="Roll a rouse check for desperation")
-    @app_commands.describe(
-        character="Character to check desperation for (optional)"
-    )
-    async def rouse_check(self, interaction: discord.Interaction, character: str = None):
+    async def rouse_check(self, interaction: discord.Interaction):
         """Roll a rouse check for desperation escalation"""
         user_id = str(interaction.user.id)
-        
+
         try:
-            # Get character info if provided
+            # Get active character
             char_name = None
             current_desperation = 0
-            
-            if character:
-                char = await find_character(user_id, character)
-                if not char:
-                    error_msg = await HeraldMessages.character_not_found(user_id, character)
-                    await interaction.response.send_message(error_msg, ephemeral=True)
-                    return
-                
-                char_name = char['name']
-                current_desperation = char.get('desperation', 0) or 0
+
+            active_char_name = await get_active_character(user_id)
+            if active_char_name:
+                char = await find_character(user_id, active_char_name)
+                if char:
+                    char_name = char['name']
+                    current_desperation = char.get('desperation', 0) or 0
             
             # Roll rouse check
             result = roll_rouse_check()
@@ -488,7 +362,6 @@ class DiceRolling(commands.Cog):
 
     @app_commands.command(name="danger", description="View or set your character's Danger rating")
     @app_commands.describe(
-        character="Character name",
         action="What to do with Danger rating",
         amount="Amount to add/subtract/set (optional for 'view')"
     )
@@ -502,18 +375,26 @@ class DiceRolling(commands.Cog):
     async def danger_command(
         self,
         interaction: discord.Interaction,
-        character: str,
         action: str,
         amount: int = None
     ):
         """Manage character-specific Danger ratings"""
         user_id = str(interaction.user.id)
-        
+
         try:
-            # Find character using fuzzy matching
-            char = await find_character(user_id, character)
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No active character set. Use `/character` to select one.",
+                    ephemeral=True
+                )
+                return
+
+            # Find character using the active character name
+            char = await find_character(user_id, active_char_name)
             if not char:
-                error_msg = await HeraldMessages.character_not_found(user_id, character)
+                error_msg = await HeraldMessages.character_not_found(user_id, active_char_name)
                 await interaction.response.send_message(error_msg, ephemeral=True)
                 return
             
@@ -628,56 +509,7 @@ class DiceRolling(commands.Cog):
             )
 
     # ===== AUTOCOMPLETE FUNCTIONS =====
-
-    @roll_character.autocomplete('character')
-    @rouse_check.autocomplete('character')
-    @danger_command.autocomplete('character')
-    async def dice_character_autocomplete(
-        self,
-        interaction: discord.Interaction,
-        current: str,
-    ) -> List[app_commands.Choice[str]]:
-        """Autocomplete character names for dice commands"""
-        return await character_autocomplete(interaction, current)
-
-    @roll_character.autocomplete('skill')
-    async def dice_skill_autocomplete(
-        self,
-        interaction: discord.Interaction,
-        current: str,
-    ) -> List[app_commands.Choice[str]]:
-        """Autocomplete skill names with enhanced error handling"""
-        try:
-            # Filter skills based on current input
-            if not current:
-                # If no input, return first 25 skills
-                return [
-                    app_commands.Choice(name=skill, value=skill)
-                    for skill in ALL_SKILLS[:25]
-                ]
-                
-            # Filter based on current input
-            filtered = [
-                skill for skill in ALL_SKILLS 
-                if current.lower() in skill.lower()
-            ]
-                
-            # Return up to 25 matches
-            return [
-                app_commands.Choice(name=skill, value=skill)
-                for skill in filtered[:25]
-            ]
-                
-        except Exception as e:
-            # Log the error but don't let it break the autocomplete
-            logger.error(f"Error in skill autocomplete: {e}")
-                
-            # Return a basic fallback list
-            basic_skills = ["Athletics", "Firearms", "Stealth", "Investigation", "Persuasion"]
-            return [
-                app_commands.Choice(name=skill, value=skill)
-                for skill in basic_skills
-            ]
+    # (None needed for current dice commands)
 
 
 async def setup(bot: commands.Bot):

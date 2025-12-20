@@ -477,11 +477,11 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
 
         # Create main embed with Herald theme
         embed = discord.Embed(
-            title=f"**{name}**",
             color=0x8B0000  # Dark red theme for Hunter
         )
+        embed.set_author(name=f"🔸 Hunter Dossier: {name}")
 
-        # === CREED/DESIRE/DRIVE/AMBITION (Vertical list) ===
+        # === CREED/DRIVE/DESIRE/AMBITION (Vertical list) ===
         embed.add_field(
             name="\u200b",
             value=f"**Creed:** {creed}",
@@ -489,12 +489,12 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         )
         embed.add_field(
             name="\u200b",
-            value=f"**Desire:** {desire}",
+            value=f"**Drive:** {drive}",
             inline=False
         )
         embed.add_field(
             name="\u200b",
-            value=f"**Drive:** {drive}",
+            value=f"**Desire:** {desire}",
             inline=False
         )
         embed.add_field(

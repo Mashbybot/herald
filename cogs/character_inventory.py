@@ -11,7 +11,7 @@ from typing import List
 import logging
 
 from core.db import get_async_db
-from core.character_utils import find_character, character_autocomplete, resolve_character
+from core.character_utils import find_character, character_autocomplete, resolve_character, get_active_character
 from config.settings import GUILD_ID
 
 logger = logging.getLogger('Herald.Character.Inventory')
@@ -158,8 +158,7 @@ class CharacterInventory(commands.Cog):
     @app_commands.describe(
         action="What to do with equipment",
         item="Item name (required for add/remove)",
-        description="Item description (optional for add)",
-        character="Character name (optional - uses active character if not specified)"
+        description="Item description (optional for add)"
     )
     @app_commands.choices(action=[
         app_commands.Choice(name="View", value="view"),
@@ -167,24 +166,30 @@ class CharacterInventory(commands.Cog):
         app_commands.Choice(name="Remove", value="remove"),
         app_commands.Choice(name="Clear All", value="clear")
     ])
-    @app_commands.autocomplete(character=character_autocomplete)
     async def equipment(
         self,
         interaction: discord.Interaction,
         action: str,
         item: str = None,
-        description: str = None,
-        character: str = None
+        description: str = None
     ):
         """Manage character equipment"""
         user_id = str(interaction.user.id)
 
         try:
-            char = await resolve_character(user_id, character)
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"❌ No active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
+                return
 
+            char = await find_character(user_id, active_char_name)
             if not char:
                 await interaction.response.send_message(
-                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
+                    f"❌ Could not find your active character.",
                     ephemeral=True
                 )
                 return
@@ -348,8 +353,7 @@ class CharacterInventory(commands.Cog):
     @app_commands.describe(
         action="What to do with notes",
         title="Note title (required for add)",
-        content="Note content (required for add)",
-        character="Character name (optional - uses active character if not specified)"
+        content="Note content (required for add)"
     )
     @app_commands.choices(action=[
         app_commands.Choice(name="View All", value="view"),
@@ -357,24 +361,30 @@ class CharacterInventory(commands.Cog):
         app_commands.Choice(name="Remove", value="remove"),
         app_commands.Choice(name="Clear All", value="clear")
     ])
-    @app_commands.autocomplete(character=character_autocomplete)
     async def notes(
         self,
         interaction: discord.Interaction,
         action: str,
         title: str = None,
-        content: str = None,
-        character: str = None
+        content: str = None
     ):
         """Manage character notes and journal entries"""
         user_id = str(interaction.user.id)
 
         try:
-            char = await resolve_character(user_id, character)
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"❌ No active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
+                return
 
+            char = await find_character(user_id, active_char_name)
             if not char:
                 await interaction.response.send_message(
-                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
+                    f"❌ Could not find your active character.",
                     ephemeral=True
                 )
                 return
