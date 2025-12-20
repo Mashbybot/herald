@@ -484,10 +484,11 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
 
         # === CREED/DRIVE/DESIRE/AMBITION (Vertical list) ===
         # Format values in code blocks when data is present (like Inconnu)
-        creed_display = f"`{creed}`" if creed != '[No Data Available]' else creed
-        drive_display = f"`{drive}`" if drive != '[No Data Available]' else drive
-        desire_display = f"`{desire}`" if desire != '[No Data Available]' else desire
-        ambition_display = f"`{ambition}`" if ambition != '[No Data Available]' else ambition
+        # Use block quotes for undefined fields
+        creed_display = f"`{creed}`" if creed != '[No Data Available]' else f"> {creed}"
+        drive_display = f"`{drive}`" if drive != '[No Data Available]' else f"> {drive}"
+        desire_display = f"`{desire}`" if desire != '[No Data Available]' else f"> {desire}"
+        ambition_display = f"`{ambition}`" if ambition != '[No Data Available]' else f"> {ambition}"
 
         embed.add_field(
             name="\u200b",
@@ -586,7 +587,7 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
 
         # Em space for alignment within column (longest in Physical: "Dexterity" = 9 chars)
         physical_attrs = [
-            f"**Strength:** {create_skill_display(strength)}",  # +0 em
+            f"**Strength:**\u2002{create_skill_display(strength)}",  # +1 en (test)
             f"**Dexterity:** {create_skill_display(dexterity)}",      # +0 em (longest)
             f"**Stamina:**\u2003{create_skill_display(stamina)}"  # +1 em
         ]
