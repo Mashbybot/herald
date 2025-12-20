@@ -472,6 +472,8 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         name = character.get('name', 'Unknown')
         creed = character.get('creed', 'No creed set')
         drive = character.get('drive', 'No drive set')
+        ambition = character.get('ambition', 'Not set')
+        desire = character.get('desire', 'Not set')
 
         # Create main embed with Herald theme
         embed = discord.Embed(
@@ -479,12 +481,32 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
             color=0x8B0000  # Dark red theme for Hunter
         )
 
-        # === CREED & DRIVE (Inline format, combined) ===
+        # === CREED/DESIRE & DRIVE/AMBITION (2x2 layout) ===
         embed.add_field(
             name="\u200b",
-            value=f"**Creed:** {creed}\n**Drive:** {drive}",
-            inline=False
+            value=f"**Creed:** {creed}",
+            inline=True
         )
+        embed.add_field(
+            name="\u200b",
+            value=f"**Desire:** {desire}",
+            inline=True
+        )
+        # Spacer to force next row
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
+
+        embed.add_field(
+            name="\u200b",
+            value=f"**Drive:** {drive}",
+            inline=True
+        )
+        embed.add_field(
+            name="\u200b",
+            value=f"**Ambition:** {ambition}",
+            inline=True
+        )
+        # Spacer to balance the row
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
 
         # Add visual separator before trackers
         embed.add_field(name="\u200b", value="\u200b", inline=False)
@@ -555,9 +577,9 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
                     inline=False
                 )
 
-        # Add visual separator
+        # Add visual separator/divider
         embed.add_field(name=HeraldEmojis.SEPARATOR, value="", inline=False)
-        
+
         # === ATTRIBUTES (Compact 3-column layout with dots) ===
         strength = max(1, min(5, character.get('strength', 1)))
         dexterity = max(1, min(5, character.get('dexterity', 1)))
@@ -605,6 +627,35 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
             inline=True
         )
 
+        # Add visual separator before skills
+        embed.add_field(name="\u200b", value="\u200b", inline=False)
+
+        # === SKILLS (Smart display with specialties integration) ===
+        if skills:
+            # Get skills with dots > 0
+            trained_skills = [skill for skill in skills if skill.get('dots', 0) > 0]
+
+            if trained_skills:
+                skill_text = []
+                for skill in trained_skills[:15]:  # Limit to prevent overflow
+                    dots = max(0, min(5, skill.get('dots', 0)))
+                    skill_display = create_skill_display(dots)
+                    skill_text.append(f"**{skill.get('skill_name', 'Unknown')}:** {skill_display} `{dots}`")
+
+                # Handle long skill lists
+                skills_display = "\n".join(skill_text)
+                if len(trained_skills) > 15:
+                    skills_display += f"\n*...and {len(trained_skills) - 15} more*"
+
+                embed.add_field(
+                    name="__Trained Skills__",
+                    value=skills_display,
+                    inline=False
+                )
+
+        # Add visual separator after skills
+        embed.add_field(name="\u200b", value="\u200b", inline=False)
+
         # === EDGE AND PERKS (Hunter Abilities) ===
         if edges:
             edge_text = []
@@ -637,48 +688,6 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
                 value="\n".join(perk_text),
                 inline=False
             )
-
-        # === HUNTER MECHANICS ===
-        h5e_mechanics = []
-
-        if character.get('ambition'):
-            h5e_mechanics.append(f"**Ambition:** {character['ambition']}")
-        if character.get('desire'):
-            h5e_mechanics.append(f"**Desire:** {character['desire']}")
-        # Note: Drive is already shown at the top of the sheet, so we don't repeat it here
-
-        if h5e_mechanics:
-            embed.add_field(
-                name="Hunter Mechanics",
-                value="\n\n".join(h5e_mechanics),
-                inline=False
-            )
-
-        # Add visual separator before skills
-        embed.add_field(name="\u200b", value="\u200b", inline=False)
-
-        # === SKILLS (Smart display with specialties integration) ===
-        if skills:
-            # Get skills with dots > 0
-            trained_skills = [skill for skill in skills if skill.get('dots', 0) > 0]
-
-            if trained_skills:
-                skill_text = []
-                for skill in trained_skills[:15]:  # Limit to prevent overflow
-                    dots = max(0, min(5, skill.get('dots', 0)))
-                    skill_display = create_skill_display(dots)
-                    skill_text.append(f"**{skill.get('skill_name', 'Unknown')}:** {skill_display} `{dots}`")
-
-                # Handle long skill lists
-                skills_display = "\n".join(skill_text)
-                if len(trained_skills) > 15:
-                    skills_display += f"\n*...and {len(trained_skills) - 15} more*"
-
-                embed.add_field(
-                    name="__Trained Skills__",
-                    value=skills_display,
-                    inline=False
-                )
 
         # Footer with helpful tips
         embed.set_footer(text="💡 Use /damage and /heal to manage health • Use /creed and /drive to set your Hunter's path")
