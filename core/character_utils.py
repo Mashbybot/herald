@@ -542,28 +542,24 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
             value=f"{health_bar} `{health_remaining}/{health_current}`",
             inline=False
         )
-        embed.add_field(name="\u200b", value="\u200b", inline=False)
 
         embed.add_field(
             name="**Willpower:**",
             value=f"{willpower_bar} `{willpower_remaining}/{willpower_current}`",
             inline=False
         )
-        embed.add_field(name="\u200b", value="\u200b", inline=False)
 
         embed.add_field(
             name="**Desperation:**",
             value=f"{desperation_bar} `{desperation}/10`",
             inline=False
         )
-        embed.add_field(name="\u200b", value="\u200b", inline=False)
 
         embed.add_field(
             name="**Danger:**",
             value=f"{danger_bar} `{danger}/10`",
             inline=False
         )
-        embed.add_field(name="\u200b", value="\u200b", inline=False)
 
         # Show Despair State if active
         if in_despair:
