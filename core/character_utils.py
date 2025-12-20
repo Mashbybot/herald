@@ -470,10 +470,10 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
 
     try:
         name = character.get('name', 'Unknown')
-        creed = character.get('creed', 'No creed set')
-        drive = character.get('drive', 'No drive set')
-        ambition = character.get('ambition', 'Not set')
-        desire = character.get('desire', 'Not set')
+        creed = character.get('creed', '[No Data Available]')
+        drive = character.get('drive', '[No Data Available]')
+        ambition = character.get('ambition', '[No Data Available]')
+        desire = character.get('desire', '[No Data Available]')
 
         # Create main embed with Herald theme
         embed = discord.Embed(
@@ -530,28 +530,34 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         danger = max(0, min(10, character.get('danger', 0)))
         danger_bar = create_danger_bar(danger)
 
-        # Display trackers in vertical list format
-        # Each tracker on its own row with header inline and aligned dots
+        # Display trackers in vertical list format with headers above dots
         embed.add_field(
-            name="\u200b",
-            value=f"**Health:**\u2003\u2003\u2003{health_bar} `{health_remaining}/{health_current}`",
+            name="**Health:**",
+            value=f"{health_bar} `{health_remaining}/{health_current}`",
             inline=False
         )
+        embed.add_field(name="\u200b", value="\u200b", inline=False)
+
         embed.add_field(
-            name="\u200b",
-            value=f"**Willpower:**\u2003\u2003{willpower_bar} `{willpower_remaining}/{willpower_current}`",
+            name="**Willpower:**",
+            value=f"{willpower_bar} `{willpower_remaining}/{willpower_current}`",
             inline=False
         )
+        embed.add_field(name="\u200b", value="\u200b", inline=False)
+
         embed.add_field(
-            name="\u200b",
-            value=f"**Desperation:**\u2003{desperation_bar} `{desperation}/10`",
+            name="**Desperation:**",
+            value=f"{desperation_bar} `{desperation}/10`",
             inline=False
         )
+        embed.add_field(name="\u200b", value="\u200b", inline=False)
+
         embed.add_field(
-            name="\u200b",
-            value=f"**Danger:**\u2003\u2003\u2003{danger_bar} `{danger}/10`",
+            name="**Danger:**",
+            value=f"{danger_bar} `{danger}/10`",
             inline=False
         )
+        embed.add_field(name="\u200b", value="\u200b", inline=False)
 
         # Show Despair State if active
         if in_despair:
