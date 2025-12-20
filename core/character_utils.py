@@ -594,9 +594,9 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
 
         # Em space for alignment within column (longest in Social: "Manipulation" = 12 chars)
         social_attrs = [
-            f"**Charisma:**\u2003\u2003\u2003{create_skill_display(charisma)}",  # +3 em
+            f"**Charisma:**\u2003\u2003{create_skill_display(charisma)}",  # +2 em
             f"**Manipulation:** {create_skill_display(manipulation)}",                 # +0 em (longest)
-            f"**Composure:**\u2003\u2003{create_skill_display(composure)}"       # +2 em
+            f"**Composure:**\u2003{create_skill_display(composure)}"       # +1 em
         ]
 
         intelligence = max(1, min(5, character.get('intelligence', 1)))
@@ -606,8 +606,8 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         # Em space for alignment within column (longest in Mental: "Intelligence" = 12 chars)
         mental_attrs = [
             f"**Intelligence:** {create_skill_display(intelligence)}",                         # +0 em (longest)
-            f"**Wits:**\u2003\u2003\u2003\u2003\u2003{create_skill_display(wits)}",  # +5 em
-            f"**Resolve:**\u2003\u2003\u2003{create_skill_display(resolve)}"               # +3 em
+            f"**Wits:**\u2003\u2003\u2003{create_skill_display(wits)}",  # +3 em
+            f"**Resolve:**\u2003\u2003{create_skill_display(resolve)}"               # +2 em
         ]
 
         embed.add_field(
