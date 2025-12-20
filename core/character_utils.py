@@ -477,9 +477,10 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
 
         # Create main embed with Herald theme
         embed = discord.Embed(
+            title=f"🔸 Hunter Dossier: {name}",
+            url="http://heraldreg.org/",
             color=0x8B0000  # Dark red theme for Hunter
         )
-        embed.set_author(name=f"🔸 Hunter Dossier: {name}")
 
         # === CREED/DRIVE/DESIRE/AMBITION (Vertical list) ===
         # Format values in code blocks when data is present (like Inconnu)
