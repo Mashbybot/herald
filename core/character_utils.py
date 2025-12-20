@@ -479,17 +479,15 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
             color=0x8B0000  # Dark red theme for Hunter
         )
 
-        # === CREED & DRIVE (Inline format) ===
+        # === CREED & DRIVE (Inline format, combined) ===
         embed.add_field(
             name="\u200b",
-            value=f"__Creed__: {creed}",
+            value=f"**Creed:** {creed}\n**Drive:** {drive}",
             inline=False
         )
-        embed.add_field(
-            name="\u200b",
-            value=f"__Drive__: {drive}",
-            inline=False
-        )
+
+        # Add visual separator before trackers
+        embed.add_field(name="\u200b", value="\u200b", inline=False)
 
         # === CORE TRACKERS (All 10 dots) ===
         # Health
@@ -560,25 +558,37 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         # Add visual separator
         embed.add_field(name=HeraldEmojis.SEPARATOR, value="", inline=False)
         
-        # === ATTRIBUTES (Compact 3-column layout) ===
+        # === ATTRIBUTES (Compact 3-column layout with dots) ===
+        strength = max(1, min(5, character.get('strength', 1)))
+        dexterity = max(1, min(5, character.get('dexterity', 1)))
+        stamina = max(1, min(5, character.get('stamina', 1)))
+
         physical_attrs = [
-            f"**Strength:** {max(1, min(5, character.get('strength', 1)))}",
-            f"**Dexterity:** {max(1, min(5, character.get('dexterity', 1)))}",
-            f"**Stamina:** {max(1, min(5, character.get('stamina', 1)))}"
+            f"**Strength:** {create_skill_display(strength)}",
+            f"**Dexterity:** {create_skill_display(dexterity)}",
+            f"**Stamina:** {create_skill_display(stamina)}"
         ]
-        
+
+        charisma = max(1, min(5, character.get('charisma', 1)))
+        manipulation = max(1, min(5, character.get('manipulation', 1)))
+        composure = max(1, min(5, character.get('composure', 1)))
+
         social_attrs = [
-            f"**Charisma:** {max(1, min(5, character.get('charisma', 1)))}",
-            f"**Manipulation:** {max(1, min(5, character.get('manipulation', 1)))}",
-            f"**Composure:** {max(1, min(5, character.get('composure', 1)))}"
+            f"**Charisma:** {create_skill_display(charisma)}",
+            f"**Manipulation:** {create_skill_display(manipulation)}",
+            f"**Composure:** {create_skill_display(composure)}"
         ]
-        
+
+        intelligence = max(1, min(5, character.get('intelligence', 1)))
+        wits = max(1, min(5, character.get('wits', 1)))
+        resolve = max(1, min(5, character.get('resolve', 1)))
+
         mental_attrs = [
-            f"**Intelligence:** {max(1, min(5, character.get('intelligence', 1)))}",
-            f"**Wits:** {max(1, min(5, character.get('wits', 1)))}",
-            f"**Resolve:** {max(1, min(5, character.get('resolve', 1)))}"
+            f"**Intelligence:** {create_skill_display(intelligence)}",
+            f"**Wits:** {create_skill_display(wits)}",
+            f"**Resolve:** {create_skill_display(resolve)}"
         ]
-        
+
         embed.add_field(
             name="__Physical__",
             value="\n".join(physical_attrs),
@@ -643,6 +653,9 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
                 value="\n\n".join(h5e_mechanics),
                 inline=False
             )
+
+        # Add visual separator before skills
+        embed.add_field(name="\u200b", value="\u200b", inline=False)
 
         # === SKILLS (Smart display with specialties integration) ===
         if skills:
