@@ -470,10 +470,10 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
 
     try:
         name = character.get('name', 'Unknown')
-        creed = character.get('creed', '[No Data Available]')
-        drive = character.get('drive', '[No Data Available]')
-        ambition = character.get('ambition', '[No Data Available]')
-        desire = character.get('desire', '[No Data Available]')
+        creed = character.get('creed') or '[No Data Available]'
+        drive = character.get('drive') or '[No Data Available]'
+        ambition = character.get('ambition') or '[No Data Available]'
+        desire = character.get('desire') or '[No Data Available]'
 
         # Create main embed with Herald theme
         embed = discord.Embed(
