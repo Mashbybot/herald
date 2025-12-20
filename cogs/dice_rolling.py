@@ -151,11 +151,10 @@ class DiceRolling(commands.Cog):
 
     @app_commands.command(name="roll", description="Roll dice using H5E mechanics")
     @app_commands.describe(
-        attribute="Attribute rating (0-5)",
-        skill="Skill rating (0-5)",
+        pool="Total dice pool to roll",
+        desperate="Use Desperation dice (adds dots from your Desperation track)",
         difficulty="Target number of successes needed",
-        desperation="Desperation rating (0-10) - adds this many desperation dice",
-        modifier="Additional dice pool modifier"
+        comment="Description of what you're rolling for"
     )
     @app_commands.choices(
         difficulty=[
@@ -171,67 +170,92 @@ class DiceRolling(commands.Cog):
     async def roll_dice(
         self,
         interaction: discord.Interaction,
-        attribute: int = 0,
-        skill: int = 0,
+        pool: int,
+        desperate: bool = False,
         difficulty: int = 0,
-        desperation: int = 0,
-        modifier: int = 0
+        comment: str = None
     ):
         """Roll dice using H5E mechanics"""
+        user_id = str(interaction.user.id)
 
         # Validate inputs
-        if attribute < 0 or attribute > 10:
+        if pool < 1 or pool > 20:
             await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Attribute must be 0-10",
-                ephemeral=True
-            )
-            return
-
-        if skill < 0 or skill > 10:
-            await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Skill must be 0-10",
-                ephemeral=True
-            )
-            return
-
-        if desperation < 0 or desperation > 10:
-            await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Desperation must be 0-10",
+                f"{HeraldEmojis.ERROR} Pool must be 1-20 dice",
                 ephemeral=True
             )
             return
 
         try:
+            # Get desperation dice from character's track if desperate=True
+            desperation_dice = 0
+            char_name = None
+            char_desperation = 0
+
+            if desperate:
+                # Get active character
+                active_char_name = await get_active_character(user_id)
+                if active_char_name:
+                    char = await find_character(user_id, active_char_name)
+                    if char:
+                        char_name = char['name']
+                        char_desperation = char.get('desperation', 0) or 0
+
+                        # Check if in despair
+                        in_despair = char.get('in_despair', False) or False
+                        if in_despair:
+                            await interaction.response.send_message(
+                                f"{HeraldEmojis.ERROR} **{char['name']}** is in Despair!\n"
+                                f"💀 Drive is unusable until redeemed.\n"
+                                f"🕊️ Redemption: {char.get('redemption', 'Not set')}",
+                                ephemeral=True
+                            )
+                            return
+
+                        if char_desperation > 0:
+                            desperation_dice = char_desperation
+                        else:
+                            await interaction.response.send_message(
+                                f"{HeraldEmojis.ERROR} {char['name']} has no Desperation to use!",
+                                ephemeral=True
+                            )
+                            return
+                else:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} No active character set. Use `/character` to select one before using desperate rolls.",
+                        ephemeral=True
+                    )
+                    return
+
             # Roll the dice
-            result = roll_pool(attribute, skill, desperation, 0)
+            result = roll_pool(pool, 0, desperation_dice, 0)
 
             # Create description
             pool_parts = []
-            if attribute > 0:
-                pool_parts.append(f"Attribute {attribute}")
-            if skill > 0:
-                pool_parts.append(f"Skill {skill}")
-            if modifier != 0:
-                pool_parts.append(f"Modifier {modifier:+d}")
-            if desperation > 0:
-                pool_parts.append(f"Desperation {desperation}")
+            pool_parts.append(f"Pool {pool}")
+            if desperation_dice > 0:
+                pool_parts.append(f"Desperation {desperation_dice}")
 
-            effective_pool = max(1, attribute + skill + modifier)
-            description = " + ".join(pool_parts) + f" = {effective_pool} dice"
-            
+            description = " + ".join(pool_parts) + f" = {pool + desperation_dice} dice"
+
             if difficulty > 0:
                 description += f" vs Difficulty {difficulty}"
-            
-            # Format and send result
-            embed = format_dice_result(result, description, difficulty=difficulty)
+
+            # Add comment if provided
+            if comment:
+                description = f"{comment}\n{description}"
+
+            # Format and send result with character name if available
+            embed = format_dice_result(result, description, char_name, difficulty=difficulty)
             await interaction.response.send_message(embed=embed)
-            
-            logger.info(f"Manual roll: {description} -> {result.total_successes} successes")
-            
+
+            log_desc = f"{comment} - " if comment else ""
+            logger.info(f"Manual roll: {log_desc}{description} -> {result.total_successes} successes")
+
         except Exception as e:
             logger.error(f"Error in roll command: {e}")
             await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Error rolling dice: {str(e)}", 
+                f"{HeraldEmojis.ERROR} Error rolling dice: {str(e)}",
                 ephemeral=True
             )
 
