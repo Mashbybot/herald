@@ -481,27 +481,26 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
             color=0x8B0000  # Dark red theme for Hunter
         )
 
-        # === CREED/DESIRE & DRIVE/AMBITION (2x2 layout) ===
+        # === CREED/DESIRE/DRIVE/AMBITION (Vertical list) ===
         embed.add_field(
             name="\u200b",
             value=f"**Creed:** {creed}",
-            inline=True
+            inline=False
         )
         embed.add_field(
             name="\u200b",
             value=f"**Desire:** {desire}",
-            inline=True
+            inline=False
         )
-
         embed.add_field(
             name="\u200b",
             value=f"**Drive:** {drive}",
-            inline=True
+            inline=False
         )
         embed.add_field(
             name="\u200b",
             value=f"**Ambition:** {ambition}",
-            inline=True
+            inline=False
         )
 
         # Add visual separator before trackers
@@ -540,12 +539,12 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         )
         embed.add_field(
             name="\u200b",
-            value=f"**Willpower:**\u2003{willpower_bar} `{willpower_remaining}/{willpower_current}`",
+            value=f"**Willpower:**\u2003\u2003{willpower_bar} `{willpower_remaining}/{willpower_current}`",
             inline=False
         )
         embed.add_field(
             name="\u200b",
-            value=f"**Desperation:** {desperation_bar} `{desperation}/10`",
+            value=f"**Desperation:**\u2003{desperation_bar} `{desperation}/10`",
             inline=False
         )
         embed.add_field(
