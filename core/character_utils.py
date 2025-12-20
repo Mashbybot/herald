@@ -594,30 +594,7 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
             value="\n".join(mental_attrs),
             inline=True
         )
-        
-        # === SKILLS (Smart display with specialties integration) ===
-        if skills:
-            # Get skills with dots > 0
-            trained_skills = [skill for skill in skills if skill.get('dots', 0) > 0]
-            
-            if trained_skills:
-                skill_text = []
-                for skill in trained_skills[:15]:  # Limit to prevent overflow
-                    dots = max(0, min(5, skill.get('dots', 0)))
-                    skill_display = create_skill_display(dots)
-                    skill_text.append(f"**{skill.get('skill_name', 'Unknown')}:** {skill_display} `{dots}`")
-                
-                # Handle long skill lists
-                skills_display = "\n".join(skill_text)
-                if len(trained_skills) > 15:
-                    skills_display += f"\n*...and {len(trained_skills) - 15} more*"
-                
-                embed.add_field(
-                    name="__Trained Skills__",
-                    value=skills_display,
-                    inline=False
-                )
-        
+
         # === EDGE AND PERKS (Hunter Abilities) ===
         if edges:
             edge_text = []
@@ -666,7 +643,30 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
                 value="\n\n".join(h5e_mechanics),
                 inline=False
             )
-        
+
+        # === SKILLS (Smart display with specialties integration) ===
+        if skills:
+            # Get skills with dots > 0
+            trained_skills = [skill for skill in skills if skill.get('dots', 0) > 0]
+
+            if trained_skills:
+                skill_text = []
+                for skill in trained_skills[:15]:  # Limit to prevent overflow
+                    dots = max(0, min(5, skill.get('dots', 0)))
+                    skill_display = create_skill_display(dots)
+                    skill_text.append(f"**{skill.get('skill_name', 'Unknown')}:** {skill_display} `{dots}`")
+
+                # Handle long skill lists
+                skills_display = "\n".join(skill_text)
+                if len(trained_skills) > 15:
+                    skills_display += f"\n*...and {len(trained_skills) - 15} more*"
+
+                embed.add_field(
+                    name="__Trained Skills__",
+                    value=skills_display,
+                    inline=False
+                )
+
         # Footer with helpful tips
         embed.set_footer(text="💡 Use /damage and /heal to manage health • Use /creed and /drive to set your Hunter's path")
         
