@@ -475,19 +475,19 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
 
         # Create main embed with Herald theme
         embed = discord.Embed(
-            title=f"🏹 {name}",
+            title=f"**{name}**",
             color=0x8B0000  # Dark red theme for Hunter
         )
 
-        # === CREED & DRIVE (Full width) ===
+        # === CREED & DRIVE (Inline format) ===
         embed.add_field(
-            name="Creed",
-            value=creed,
+            name="\u200b",
+            value=f"__Creed__: {creed}",
             inline=False
         )
         embed.add_field(
-            name="Drive",
-            value=drive,
+            name="\u200b",
+            value=f"__Drive__: {drive}",
             inline=False
         )
 
