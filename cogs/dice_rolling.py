@@ -24,6 +24,15 @@ from config.settings import GUILD_ID
 
 logger = logging.getLogger('Herald.Dice')
 
+# Dice result thumbnails
+# TODO: Replace these URLs with your own hosted thumbnail images
+THUMBNAIL_URLS = {
+    "success": "https://i.imgur.com/example_success.png",     # Regular success thumbnail
+    "failure": "https://i.imgur.com/example_failure.png",     # Failure thumbnail
+    "critical": "https://i.imgur.com/example_critical.png",   # Critical success thumbnail
+    "overreach": "https://i.imgur.com/example_overreach.png"  # Messy critical/overreach thumbnail
+}
+
 # H5E Attributes for choices
 H5E_ATTRIBUTES = [
     "Strength", "Dexterity", "Stamina",
@@ -32,48 +41,70 @@ H5E_ATTRIBUTES = [
 ]
 
 
-def format_dice_result(result: DiceResult, pool_description: str = None, 
+def format_dice_result(result: DiceResult, pool_description: str = None,
                       character_name: str = None, difficulty: int = 0, danger: int = 0) -> discord.Embed:
     """Format dice result in clean Inconnu-style layout"""
-    
+
     # === STEP 1: Calculate core values ===
     margin = result.total_successes - difficulty
-    
+
     # === STEP 2: Get formatted components ===
     success_text = create_success_description(result.total_successes, result.crits, result.messy_critical)
     color = get_result_color(result.total_successes, result.crits, result.messy_critical)
     margin_text = format_margin_display(margin)
-    
-    # === STEP 3: Create embed with clean title ===
+
+    # === STEP 2.5: Determine thumbnail based on result type ===
+    thumbnail_url = None
+    if result.has_overreach or result.messy_critical:
+        thumbnail_url = THUMBNAIL_URLS.get("overreach")
+    elif result.crits > 0:
+        thumbnail_url = THUMBNAIL_URLS.get("critical")
+    elif result.total_successes > 0:
+        thumbnail_url = THUMBNAIL_URLS.get("success")
+    else:
+        thumbnail_url = THUMBNAIL_URLS.get("failure")
+
+    # === STEP 3: Create embed with clean title and thumbnail ===
     if character_name:
         embed = discord.Embed(title=character_name, color=color)
     else:
         embed = discord.Embed(title="Dice Roll", color=color)
+
+    # Set thumbnail if URL is available
+    if thumbnail_url:
+        embed.set_thumbnail(url=thumbnail_url)
     
     # === STEP 4: Main result (large, prominent) ===
-    embed.add_field(name="", value=f"# **{success_text}**", inline=False)
-    
-    # === STEP 5: Pool calculation (small subtitle) ===
-    if pool_description:
-        pool_calc = pool_description.split(" = ")[0] if " = " in pool_description else pool_description
-        embed.add_field(name="", value=f"-# {pool_calc}", inline=False)
-    
-    # === STEP 6: Danger warning (if present) ===
-    if danger > 0:
-        embed.add_field(
-            name="",
-            value=f"⚠️ **Danger {danger}** active (adds +{danger} to difficulty)",
-            inline=False
-        )
-    
-    # === STEP 7: Dice display ===
+    embed.add_field(name="", value=f"**{success_text}**", inline=False)
+
+    # === STEP 5: Margin ===
+    if difficulty > 0:
+        embed.add_field(name="Margin", value=str(margin), inline=False)
+
+    # === STEP 6: Dice display ===
     dice_display = create_inconnu_dice_display(result)
     if dice_display:
         embed.add_field(name="", value=dice_display, inline=False)
-    
-    # === STEP 8: Margin if difficulty was set ===
+
+    # === STEP 7: Pool | Desperation | Difficulty (bottom line) ===
+    bottom_parts = []
+
+    # Pool info
+    if pool_description:
+        pool_calc = pool_description.split(" = ")[0] if " = " in pool_description else pool_description
+        bottom_parts.append(f"**Dice:** {len(result.dice)}")
+
+    # Desperation dice count
+    if result.desperation_dice:
+        bottom_parts.append(f"**Hunger:** {len(result.desperation_dice)}")
+
+    # Difficulty
     if difficulty > 0:
-        embed.add_field(name="", value=margin_text, inline=False)
+        actual_diff = difficulty + danger if danger > 0 else difficulty
+        bottom_parts.append(f"**Difficulty:** {actual_diff}")
+
+    if bottom_parts:
+        embed.add_field(name="", value=" | ".join(bottom_parts), inline=False)
 
     # === STEP 9: Critical warnings with Herald's voice ===
     if result.messy_critical:
