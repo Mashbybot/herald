@@ -106,10 +106,18 @@ class HeraldBot(commands.Bot):
             if GUILD_ID:
                 # Development mode - sync to specific guild (instant updates)
                 guild = discord.Object(id=GUILD_ID)
+                # Clear old commands first to ensure parameter changes take effect
+                self.tree.clear_commands(guild=guild)
+                await self.tree.sync(guild=guild)
+                # Now sync with new command signatures
                 synced = await self.tree.sync(guild=guild)
                 self.logger.info(f"⚡ Synced {len(synced)} commands to guild {GUILD_ID} (instant)")
             else:
                 # Production mode - sync globally (may take up to 1 hour)
+                # Clear old commands first to ensure parameter changes take effect
+                self.tree.clear_commands(guild=None)
+                await self.tree.sync()
+                # Now sync with new command signatures
                 synced = await self.tree.sync()
                 self.logger.info(f"🌍 Synced {len(synced)} commands globally")
                 self.logger.warning(f"⏰ Global command sync can take up to 1 hour to propagate to all servers")
