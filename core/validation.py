@@ -11,7 +11,6 @@ from core.constants import (
     TEXT_FIELD_MAX_LENGTH, SPECIALTY_NAME_MAX_LENGTH,
     ATTRIBUTE_MIN, ATTRIBUTE_MAX,
     SKILL_MIN, SKILL_MAX,
-    EDGE_MIN, EDGE_MAX,
     DESPERATION_MIN, DESPERATION_MAX,
     DANGER_MIN, DANGER_MAX,
     CHAR_NAME_PATTERN,
@@ -129,13 +128,6 @@ def validate_specialty_name(name: str) -> Tuple[bool, Optional[str]]:
     return True, None
 
 
-def validate_edge(value: int) -> Tuple[bool, Optional[str]]:
-    """Validate Edge value (0-5)"""
-    if value < EDGE_MIN or value > EDGE_MAX:
-        return False, f"Edge must be between {EDGE_MIN} and {EDGE_MAX}"
-    return True, None
-
-
 def validate_desperation(value: int) -> Tuple[bool, Optional[str]]:
     """Validate Desperation value (0-10)"""
     if value < DESPERATION_MIN or value > DESPERATION_MAX:
@@ -215,11 +207,6 @@ def clamp_attribute(value: int) -> int:
 def clamp_skill(value: int) -> int:
     """Clamp skill to valid range (0-5)"""
     return clamp(value, SKILL_MIN, SKILL_MAX)
-
-
-def clamp_edge(value: int) -> int:
-    """Clamp edge to valid range (0-5)"""
-    return clamp(value, EDGE_MIN, EDGE_MAX)
 
 
 def clamp_desperation(value: int) -> int:

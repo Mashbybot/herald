@@ -191,19 +191,6 @@ def create_willpower_bar(current_max: int, superficial: int, aggravated: int, ma
         return "❓" * max_possible
 
 
-def create_edge_bar(edge: int, max_edge: int = 5) -> str:
-    """Create edge rating display with validation"""
-    try:
-        edge = max(0, min(edge, max_edge))
-        return (
-            HeraldEmojis.EDGE * edge + 
-            HeraldEmojis.EDGE_EMPTY * (max_edge - edge)
-        )
-    except Exception as e:
-        logger.error(f"Error creating edge bar: {e}")
-        return "❓" * max_edge
-
-
 def create_desperation_bar(desperation: int, max_desperation: int = 10) -> str:
     """Create desperation level display with validation"""
     try:

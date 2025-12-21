@@ -16,8 +16,7 @@ from core.character_utils import (
     get_active_character
 )
 from core.ui_utils import (
-    HeraldEmojis, HeraldMessages, HeraldColors, create_health_bar, create_willpower_bar,
-    create_edge_bar, create_desperation_bar
+    HeraldEmojis, HeraldMessages, HeraldColors, create_health_bar, create_willpower_bar
 )
 from config.settings import GUILD_ID
 
