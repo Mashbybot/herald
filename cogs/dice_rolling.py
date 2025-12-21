@@ -259,49 +259,6 @@ class DiceRolling(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="simple", description="Roll a simple dice pool")
-    @app_commands.describe(
-        pool="Number of dice to roll",
-        description="Description of what you're rolling for"
-    )
-    async def simple_dice(
-        self,
-        interaction: discord.Interaction,
-        pool: int,
-        description: str = None
-    ):
-        """Roll a simple dice pool without H5E mechanics"""
-        
-        if pool < 1 or pool > 50:
-            await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Pool size must be between 1 and 50", 
-                ephemeral=True
-            )
-            return
-        
-        try:
-            # Roll simple pool
-            result_dict = simple_roll(pool)
-            
-            # Convert to DiceResult format for consistency
-            dice_result = DiceResult(result_dict['dice'])
-            
-            # Use same formatter but simpler description
-            pool_desc = f"Simple {pool}-die pool"
-            if description:
-                pool_desc += f": {description}"
-            
-            embed = format_dice_result(dice_result, pool_desc, difficulty=0, danger=0)
-            await interaction.response.send_message(embed=embed)
-            logger.info(f"Simple roll: {pool} dice -> {dice_result.total_successes} successes")
-            
-        except Exception as e:
-            logger.error(f"Error in simple command: {e}")
-            await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Error rolling dice: {str(e)}", 
-                ephemeral=True
-            )
-
     @app_commands.command(name="danger", description="View or set your character's Danger rating")
     @app_commands.describe(
         action="What to do with Danger rating",

@@ -133,31 +133,36 @@ class CharacterProgression(commands.Cog):
     @app_commands.command(name="skill_set", description="Set dots for a skill on your character")
     @app_commands.describe(
         skill="Skill to update",
-        dots="Skill rating (0-5)",
-        character_name="Character name (optional - uses active character if not specified)"
+        dots="Skill rating (0-5)"
     )
     @app_commands.choices(skill=[
         app_commands.Choice(name=skill, value=skill)
         for skill in ALL_SKILLS[:25]  # Discord limit
     ])
-    @app_commands.autocomplete(character_name=character_autocomplete)
     async def skill_set(
         self,
         interaction: discord.Interaction,
         skill: str,
-        dots: int,
-        character_name: str = None
+        dots: int
     ):
         """Set skill dots for a character"""
         user_id = str(interaction.user.id)
         dots = max(0, min(dots, 5))  # Clamp to valid range
 
         try:
-            char = await resolve_character(user_id, character_name)
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
+                return
 
+            char = await find_character(user_id, active_char_name)
             if not char:
                 await interaction.response.send_message(
-                    f"❌ No character specified and no active character set. Use `/character` to set your active character.",
+                    f"{HeraldEmojis.ERROR} Active character '{active_char_name}' not found.",
                     ephemeral=True
                 )
                 return
@@ -187,200 +192,6 @@ class CharacterProgression(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="skill_template", description="Apply a pre-made skill distribution template")
-    @app_commands.describe(
-        template="Skill distribution template to apply"    )
-    @app_commands.choices(template=[
-        app_commands.Choice(name="Balanced (Jack of All Trades)", value="balanced"),
-        app_commands.Choice(name="Specialized (Expert Focus)", value="specialized"),
-        app_commands.Choice(name="Generalist (Broad Knowledge)", value="generalist")
-    ])
-    async def skill_template(self, interaction: discord.Interaction, template: str):
-        """Apply a skill distribution template"""
-        user_id = str(interaction.user.id)
-        
-        # Template definitions
-        TEMPLATES = {
-            "balanced": {
-                "name": "Balanced",
-                "description": "9 skills at 3 dots, 9 at 2 dots, 9 at 1 dot",
-                "distribution": {"3": 9, "2": 9, "1": 9, "0": 0}
-            },
-            "specialized": {
-                "name": "Specialized",
-                "description": "3 skills at 4 dots, 6 at 3 dots, 6 at 2 dots, 12 at 1 dot",
-                "distribution": {"4": 3, "3": 6, "2": 6, "1": 12, "0": 0}
-            },
-            "generalist": {
-                "name": "Generalist",
-                "description": "18 skills at 2 dots, 9 at 1 dot",
-                "distribution": {"2": 18, "1": 9, "0": 0}
-            }
-        }
-        
-        template_info = TEMPLATES.get(template)
-        if not template_info:
-            await interaction.response.send_message("❌ Invalid template", ephemeral=True)
-            return
-
-        try:
-            # Get active character
-            active_char_name = await get_active_character(user_id)
-            if not active_char_name:
-                await interaction.response.send_message(
-                    f"❌ No active character set. Use `/character` to set your active character.",
-                    ephemeral=True
-                )
-                return
-
-            char = await find_character(user_id, active_char_name)
-            if not char:
-                await interaction.response.send_message(
-                    f"❌ Could not find your active character.",
-                    ephemeral=True
-                )
-                return
-
-            # Create confirmation view
-            embed = discord.Embed(
-                title=f"📋 Apply {template_info['name']} Template?",
-                description=f"This will reset all skills for **{char['name']}** and apply the following distribution:",
-                color=0xFF4500
-            )
-            
-            embed.add_field(
-                name="📊 Skill Distribution",
-                value=template_info['description'],
-                inline=False
-            )
-            
-            embed.add_field(
-                name="⚠️ Warning",
-                value="This will **overwrite** all current skill dots. This action cannot be undone!",
-                inline=False
-            )
-            
-            view = SkillTemplateView(user_id, char['name'], template, template_info)
-            await interaction.response.send_message(embed=embed, view=view)
-            
-        except Exception as e:
-            logger.error(f"Error in skill_template command: {e}")
-            await interaction.response.send_message(
-                "❌ An error occurred while preparing the template", 
-                ephemeral=True
-            )
-
-    @app_commands.command(name="skill_bulk", description="Set multiple skills at once")
-    @app_commands.describe(
-        skill_list="Comma-separated skill:dots pairs (e.g., 'Athletics:3,Stealth:2,Investigation:4')"    )
-    async def skill_bulk(self, interaction: discord.Interaction, skill_list: str):
-        """Bulk set multiple skills"""
-        user_id = str(interaction.user.id)
-        
-        try:
-            # Parse skill updates
-            skill_updates = []
-            for pair in skill_list.split(','):
-                pair = pair.strip()
-                if ':' not in pair:
-                    continue
-                skill_name, dots_str = pair.split(':', 1)
-                skill_name = skill_name.strip()
-                try:
-                    dots = int(dots_str.strip())
-                    dots = max(0, min(dots, 5))
-                    skill_updates.append((skill_name, dots))
-                except ValueError:
-                    continue
-            
-            if not skill_updates:
-                await interaction.response.send_message(
-                    "❌ Invalid format. Use: 'Skill1:dots,Skill2:dots' (e.g., 'Athletics:3,Stealth:2')",
-                    ephemeral=True
-                )
-                return
-
-            # Get active character
-            active_char_name = await get_active_character(user_id)
-            if not active_char_name:
-                await interaction.response.send_message(
-                    f"❌ No active character set. Use `/character` to set your active character.",
-                    ephemeral=True
-                )
-                return
-
-            char = await find_character(user_id, active_char_name)
-            if not char:
-                await interaction.response.send_message(
-                    f"❌ Could not find your active character.",
-                    ephemeral=True
-                )
-                return
-
-            async with get_async_db() as conn:
-                # Validate all skills exist and update them
-                updated_skills = []
-                errors = []
-                
-                for skill_name, dots in skill_updates:
-                    # Check if skill exists
-                    skill_check = await conn.fetchrow("""
-                        SELECT skill_name 
-                        FROM skills 
-                        WHERE user_id = $1 AND character_name = $2 AND skill_name = $3
-                    """, user_id, char['name'], skill_name)
-                    
-                    if not skill_check:
-                        errors.append(f"**{skill_name}** not found")
-                        continue
-                    
-                    # Update skill
-                    await conn.execute("""
-                        UPDATE skills 
-                        SET dots = $1
-                        WHERE user_id = $2 AND character_name = $3 AND skill_name = $4
-                    """, dots, user_id, char['name'], skill_name)
-                    
-                    updated_skills.append((skill_name, dots))
-            
-            # Create response
-            embed = discord.Embed(
-                title="✅ Skills Updated",
-                description=f"Updated {len(updated_skills)} skills for **{char['name']}**",
-                color=0x228B22
-            )
-            
-            if updated_skills:
-                skills_text = '\n'.join([
-                    f"**{skill}**: {'●' * dots}{'○' * (5 - dots)} ({dots}/5)"
-                    for skill, dots in updated_skills
-                ])
-                
-                # Split into chunks if too long
-                if len(skills_text) > 1024:
-                    chunks = [skills_text[i:i+1024] for i in range(0, len(skills_text), 1024)]
-                    for i, chunk in enumerate(chunks):
-                        field_name = "Updated Skills" if i == 0 else f"Updated Skills (cont. {i+1})"
-                        embed.add_field(name=field_name, value=chunk, inline=False)
-                else:
-                    embed.add_field(name="Updated Skills", value=skills_text, inline=False)
-            
-            if errors:
-                embed.add_field(
-                    name="⚠️ Errors",
-                    value='\n'.join(errors),
-                    inline=False
-                )
-            
-            await interaction.response.send_message(embed=embed)
-            logger.info(f"Bulk updated {len(updated_skills)} skills for {char['name']} (user {user_id})")
-            
-        except Exception as e:
-            logger.error(f"Error in skill_bulk command: {e}")
-            await interaction.response.send_message(
-                "❌ An error occurred while updating skills", 
-                ephemeral=True
-            )
     # ===== SPECIALTY COMMANDS =====
 
     @app_commands.command(name="specialty", description="Manage skill specialties")
@@ -569,150 +380,6 @@ class CharacterProgression(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="specialty_bulk", description="Add multiple specialties at once")
-    @app_commands.describe(
-        specialty_list="Comma-separated skill:specialty pairs (e.g., 'Athletics:Running,Firearms:Pistols')"    )
-    async def specialty_bulk(self, interaction: discord.Interaction, specialty_list: str):
-        """Bulk add multiple specialties"""
-        user_id = str(interaction.user.id)
-
-        try:
-            # Parse specialty updates
-            specialty_updates = []
-            for pair in specialty_list.split(','):
-                pair = pair.strip()
-                if ':' not in pair:
-                    continue
-                skill_name, specialty_name = pair.split(':', 1)
-                skill_name = skill_name.strip()
-                specialty_name = specialty_name.strip()
-                if skill_name and specialty_name:
-                    specialty_updates.append((skill_name, specialty_name))
-
-            if not specialty_updates:
-                await interaction.response.send_message(
-                    "❌ Invalid format. Use: 'Skill1:Specialty1,Skill2:Specialty2' (e.g., 'Athletics:Running,Firearms:Pistols')",
-                    ephemeral=True
-                )
-                return
-
-            # Get active character
-            active_char_name = await get_active_character(user_id)
-            if not active_char_name:
-                await interaction.response.send_message(
-                    f"❌ No active character set. Use `/character` to set your active character.",
-                    ephemeral=True
-                )
-                return
-
-            char = await find_character(user_id, active_char_name)
-            if not char:
-                await interaction.response.send_message(
-                    f"❌ Could not find your active character.",
-                    ephemeral=True
-                )
-                return
-            
-            async with get_async_db() as conn:
-                # Validate all skills have dots and check limits
-                errors = []
-                added_specialties = []
-                
-                for skill_name, specialty_name in specialty_updates:
-                    # Check skill dots
-                    skill_data = await conn.fetchrow("""
-                        SELECT dots 
-                        FROM skills 
-                        WHERE user_id = $1 AND character_name = $2 AND skill_name = $3
-                    """, user_id, char['name'], skill_name)
-                    
-                    if not skill_data or skill_data['dots'] == 0:
-                        errors.append(f"**{skill_name}** has 0 dots")
-                        continue
-                    
-                    skill_dots = skill_data['dots']
-                    
-                    # Check current specialty count
-                    current_count = await conn.fetchval("""
-                        SELECT COUNT(*) 
-                        FROM specialties 
-                        WHERE user_id = $1 AND character_name = $2 AND skill_name = $3
-                    """, user_id, char['name'], skill_name)
-                    
-                    max_specialties = max(1, skill_dots)
-                    
-                    if current_count >= max_specialties:
-                        errors.append(f"**{skill_name}** already has maximum specialties ({max_specialties})")
-                        continue
-                    
-                    # Check for duplicate
-                    exists = await conn.fetchval("""
-                        SELECT id 
-                        FROM specialties 
-                        WHERE user_id = $1 AND character_name = $2 AND skill_name = $3 AND specialty_name = $4
-                    """, user_id, char['name'], skill_name, specialty_name)
-                    
-                    if exists:
-                        errors.append(f"**{skill_name}**: {specialty_name} already exists")
-                        continue
-                    
-                    # Add specialty
-                    try:
-                        await conn.execute("""
-                            INSERT INTO specialties (user_id, character_name, skill_name, specialty_name)
-                            VALUES ($1, $2, $3, $4)
-                        """, user_id, char['name'], skill_name, specialty_name)
-                        added_specialties.append((skill_name, specialty_name))
-                    except Exception as e:
-                        errors.append(f"**{skill_name}**: {specialty_name} - {str(e)[:50]}")
-            
-            # Create response
-            embed = discord.Embed(
-                title="🎯 Bulk Specialty Addition",
-                description=f"Processed {len(added_specialties)} specialties for **{char['name']}**",
-                color=0x228B22 if added_specialties else 0xFF4500
-            )
-            
-            if added_specialties:
-                # Group by skill
-                from collections import defaultdict
-                skills_dict = defaultdict(list)
-                for skill_name, specialty_name in added_specialties:
-                    skills_dict[skill_name].append(specialty_name)
-                
-                specs_text = []
-                for skill_name, spec_list in sorted(skills_dict.items()):
-                    specs_text.append(f"**{skill_name}**")
-                    for spec in spec_list:
-                        specs_text.append(f"  • {spec}")
-                
-                # Split into chunks if needed
-                specs_str = '\n'.join(specs_text)
-                if len(specs_str) > 1024:
-                    chunks = [specs_text[i:i+20] for i in range(0, len(specs_text), 20)]
-                    for i, chunk in enumerate(chunks):
-                        field_name = "Added Specialties" if i == 0 else f"Added Specialties (cont. {i+1})"
-                        embed.add_field(name=field_name, value="\n".join(chunk), inline=False)
-                else:
-                    embed.add_field(name="Added Specialties", value=specs_str, inline=False)
-            
-            if errors:
-                errors_str = '\n'.join(errors[:10])  # Limit to 10 errors
-                embed.add_field(name="⚠️ Errors", value=errors_str, inline=False)
-                if len(errors) > 10:
-                    embed.add_field(name="", value=f"...and {len(errors) - 10} more errors", inline=False)
-            
-            embed.set_footer(text=f"Added {len(added_specialties)} specialties")
-            
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            logger.info(f"Bulk added {len(added_specialties)} specialties for {char['name']} (user {user_id})")
-            
-        except Exception as e:
-            logger.error(f"Error in specialty_bulk command: {e}")
-            await interaction.response.send_message(
-                "❌ An error occurred while adding specialties",
-                ephemeral=True
-            )
     # ===== EXPERIENCE POINT COMMANDS =====
 
     @app_commands.command(name="xp", description="View or manage your character's experience points")

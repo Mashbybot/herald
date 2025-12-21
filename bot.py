@@ -83,7 +83,7 @@ class HeraldBot(commands.Bot):
             'cogs.character_management',
             'cogs.character_gameplay',
             'cogs.character_progression',
-            'cogs.character_inventory',
+            # 'cogs.character_inventory',  # Disabled - notes command removed, journal system coming later
             'cogs.dice_rolling',
         ]
 
