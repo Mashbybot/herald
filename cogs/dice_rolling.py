@@ -112,7 +112,7 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
                 name="",
                 value=f"💀 **AUTOMATIC DESPAIR** - Failed roll + {result.desperation_ones} one(s) on Desperation dice\n\n"
                       f"Drive becomes useless until redeemed.\n"
-                      f"Use `/enter_despair` to mark character state.",
+                      f"Use `/despair` to mark character state.",
                 inline=False
             )
 

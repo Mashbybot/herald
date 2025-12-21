@@ -248,7 +248,7 @@ class CharacterProgression(commands.Cog):
                 
                 if not specialties:
                     await interaction.response.send_message(
-                        f"**{char['name']}** has no specialties yet. Use `/specialty character:Name action:add skill:SkillName specialty:\"Specialty Name\"` to add one!",
+                        f"**{char['name']}** has no specialties yet. Use `/specialty action:add skill:SkillName specialty:\"Specialty Name\"` to add one!",
                         ephemeral=True
                     )
                     return
