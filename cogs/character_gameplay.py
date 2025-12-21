@@ -85,6 +85,10 @@ class CreedSelectionView(discord.ui.View):
                     creed, self.user_id, self.character_name
                 )
 
+            # Invalidate cache to ensure /sheet shows updated value
+            from core.character_utils import invalidate_character_cache
+            invalidate_character_cache(self.user_id, self.character_name)
+
             embed = discord.Embed(
                 title=f"{HeraldEmojis.CREED} Creed Set",
                 description=f"**{self.character_name}'s Creed:** {creed}\n\n*{description}*",
@@ -170,6 +174,10 @@ class DriveSelectionView(discord.ui.View):
                     "UPDATE characters SET drive = $1, redemption = $2 WHERE user_id = $3 AND name = $4",
                     drive, redemption, self.user_id, self.character_name
                 )
+
+            # Invalidate cache to ensure /sheet shows updated value
+            from core.character_utils import invalidate_character_cache
+            invalidate_character_cache(self.user_id, self.character_name)
 
             embed = discord.Embed(
                 title=f"{HeraldEmojis.DRIVE} Drive Set",
@@ -291,13 +299,17 @@ class CharacterGameplay(commands.Cog):
                     new_sup, new_agg, user_id, char['name']
                 )
 
+            # Invalidate cache to ensure /sheet shows updated value
+            from core.character_utils import invalidate_character_cache
+            invalidate_character_cache(user_id, char['name'])
+
             # Create response with proper display functions
             remaining = max_track - new_sup - new_agg
             if track == "health":
                 damage_bar_display = create_health_bar(max_track, new_sup, new_agg, 8)
             else:
                 damage_bar_display = create_willpower_bar(max_track, new_sup, new_agg, 10)
-            
+
             embed = discord.Embed(
                 title=f"{HeraldEmojis.CRITICAL} Damage Applied",
                 description=f"**{char['name']}** takes {amount} {damage_type} {track} damage",
@@ -424,13 +436,17 @@ class CharacterGameplay(commands.Cog):
                     new_sup, new_agg, user_id, char['name']
                 )
 
+            # Invalidate cache to ensure /sheet shows updated value
+            from core.character_utils import invalidate_character_cache
+            invalidate_character_cache(user_id, char['name'])
+
             # Create response with proper display functions
             remaining = max_track - new_sup - new_agg
             if track == "health":
                 damage_bar_display = create_health_bar(max_track, new_sup, new_agg, 8)
             else:
                 damage_bar_display = create_willpower_bar(max_track, new_sup, new_agg, 10)
-            
+
             heal_text = f"all damage" if heal_type == "all" else f"{healed_amount} {heal_type} damage"
             
             embed = discord.Embed(
@@ -768,7 +784,11 @@ class CharacterGameplay(commands.Cog):
                     "UPDATE characters SET ambition = $1 WHERE user_id = $2 AND name = $3",
                     ambition, user_id, char['name']
                 )
-            
+
+            # Invalidate cache to ensure /sheet shows updated value
+            from core.character_utils import invalidate_character_cache
+            invalidate_character_cache(user_id, char['name'])
+
             embed = discord.Embed(
                 title=f"{HeraldEmojis.AMBITION} Ambition Set",
                 color=0x4169E1
@@ -1035,6 +1055,10 @@ class CharacterGameplay(commands.Cog):
                     user_id, char['name']
                 )
 
+            # Invalidate cache to ensure /sheet shows updated value
+            from core.character_utils import invalidate_character_cache
+            invalidate_character_cache(user_id, char['name'])
+
             # Create response
             embed = discord.Embed(
                 title=f"💀 {char['name']} Enters Despair",
@@ -1115,6 +1139,10 @@ class CharacterGameplay(commands.Cog):
                     "UPDATE characters SET in_despair = FALSE WHERE user_id = $1 AND name = $2",
                     user_id, char['name']
                 )
+
+            # Invalidate cache to ensure /sheet shows updated value
+            from core.character_utils import invalidate_character_cache
+            invalidate_character_cache(user_id, char['name'])
 
             # Create response
             embed = discord.Embed(

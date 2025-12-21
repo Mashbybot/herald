@@ -175,6 +175,10 @@ class CharacterProgression(commands.Cog):
                     WHERE user_id = $2 AND character_name = $3 AND skill_name = $4
                 """, dots, user_id, char['name'], skill)
 
+            # Invalidate cache to ensure /sheet shows updated value
+            from core.character_utils import invalidate_character_cache
+            invalidate_character_cache(user_id, char['name'])
+
             # Response
             embed = discord.Embed(
                 title="✅ Skill Updated",
@@ -318,7 +322,11 @@ class CharacterProgression(commands.Cog):
                             INSERT INTO specialties (user_id, character_name, skill_name, specialty_name)
                             VALUES ($1, $2, $3, $4)
                         """, user_id, char['name'], skill, specialty)
-                        
+
+                        # Invalidate cache to ensure /sheet shows updated specialties
+                        from core.character_utils import invalidate_character_cache
+                        invalidate_character_cache(user_id, char['name'])
+
                         embed = discord.Embed(
                             title="✅ Specialty Added",
                             description=f"**{char['name']}** gained a specialty",
@@ -346,10 +354,14 @@ class CharacterProgression(commands.Cog):
                 elif action == "remove":
                     # Remove specialty
                     result = await conn.execute("""
-                        DELETE FROM specialties 
+                        DELETE FROM specialties
                         WHERE user_id = $1 AND character_name = $2 AND skill_name = $3 AND specialty_name = $4
                     """, user_id, char['name'], skill, specialty)
-                    
+
+                    # Invalidate cache to ensure /sheet shows updated specialties
+                    from core.character_utils import invalidate_character_cache
+                    invalidate_character_cache(user_id, char['name'])
+
                     # Check if anything was deleted (PostgreSQL specific)
                     if result == "DELETE 0":
                         await interaction.response.send_message(
@@ -520,11 +532,15 @@ class CharacterProgression(commands.Cog):
                 
                 # Update database
                 await conn.execute("""
-                    UPDATE characters 
+                    UPDATE characters
                     SET experience_total = $1, experience_spent = $2
                     WHERE user_id = $3 AND name = $4
                 """, new_total, new_spent, user_id, char['name'])
-                
+
+                # Invalidate cache to ensure /sheet shows updated value
+                from core.character_utils import invalidate_character_cache
+                invalidate_character_cache(user_id, char['name'])
+
                 # Log the change
                 await conn.execute("""
                     INSERT INTO xp_log (user_id, character_name, action, amount, reason)

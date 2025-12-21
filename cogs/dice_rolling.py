@@ -359,11 +359,15 @@ class DiceRolling(commands.Cog):
             # Update database with async
             async with get_async_db() as conn:
                 await conn.execute("""
-                    UPDATE characters 
+                    UPDATE characters
                     SET danger = $1
                     WHERE user_id = $2 AND name = $3
                 """, new_danger, user_id, char['name'])
-            
+
+            # Invalidate cache to ensure /sheet shows updated value
+            from core.character_utils import invalidate_character_cache
+            invalidate_character_cache(user_id, char['name'])
+
             # Create response
             change = new_danger - current_danger
             change_text = f"+{change}" if change > 0 else str(change) if change < 0 else "±0"
