@@ -1309,19 +1309,12 @@ class CharacterProgression(commands.Cog):
     # ===== AUTOCOMPLETE FUNCTIONS =====
 
     @skill_set.autocomplete('character_name')
-    @skill_template.autocomplete('character')
-    @skill_bulk.autocomplete('character')
-    @specialty.autocomplete('character')
-    @specialty_bulk.autocomplete('character')
-    @experience_points.autocomplete('character')
-    @spend_xp.autocomplete('character')
-    @xp_log.autocomplete('character')
     async def progression_character_autocomplete(
         self,
         interaction: discord.Interaction,
         current: str,
     ) -> List[app_commands.Choice[str]]:
-        """Autocomplete character names for progression commands"""
+        """Autocomplete character names for skill_set command"""
         return await character_autocomplete(interaction, current)
 
     @spend_xp.autocomplete('target')

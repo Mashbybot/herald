@@ -1175,26 +1175,6 @@ class CharacterGameplay(commands.Cog):
             logger.error(f"Error getting skill {skill_name}: {e}")
             return None
 
-    # ===== AUTOCOMPLETE FUNCTIONS =====
-    
-    @apply_damage.autocomplete('character')
-    @heal_damage.autocomplete('character')
-    @desperation.autocomplete('character')
-    @creed.autocomplete('character')
-    @ambition.autocomplete('character')
-    @desire.autocomplete('character')
-    @drive.autocomplete('character')
-    @enter_despair.autocomplete('character')
-    @exit_despair.autocomplete('character')
-    async def gameplay_character_autocomplete(
-        self,
-        interaction: discord.Interaction,
-        current: str,
-    ) -> List[app_commands.Choice[str]]:
-        """Autocomplete character names for gameplay commands"""
-        return await character_autocomplete(interaction, current)
-
-
 async def setup(bot: commands.Bot):
     """Setup function for the Character Gameplay cog"""
     cog = CharacterGameplay(bot)

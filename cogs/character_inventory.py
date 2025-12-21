@@ -519,16 +519,6 @@ class CharacterInventory(commands.Cog):
 
     # ===== AUTOCOMPLETE FUNCTIONS =====
 
-    @equipment.autocomplete('character')
-    @notes.autocomplete('character')
-    async def inventory_character_autocomplete(
-        self,
-        interaction: discord.Interaction,
-        current: str,
-    ) -> List[app_commands.Choice[str]]:
-        """Autocomplete character names for inventory commands"""
-        return await character_autocomplete(interaction, current)
-
     @equipment.autocomplete('item')
     async def equipment_item_autocomplete(
         self,
