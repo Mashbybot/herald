@@ -390,7 +390,7 @@ class CharacterProgression(commands.Cog):
     @app_commands.choices(action=[
         app_commands.Choice(name="View", value="view"),
         app_commands.Choice(name="Add", value="add"),
-        app_commands.Choice(name="Subtract", value="subtract"),
+        app_commands.Choice(name="Spend", value="spend"),
         app_commands.Choice(name="Set", value="set")
     ])
     async def experience_points(
@@ -498,15 +498,24 @@ class CharacterProgression(commands.Cog):
             async with get_async_db() as conn:
                 if action == "add":
                     new_total = current_total + amount
+                    new_spent = current_spent
                     action_text = f"Gained {amount} XP"
-                elif action == "subtract":
-                    new_total = max(current_spent, current_total - amount)
-                    action_text = f"Lost {amount} XP"
+                elif action == "spend":
+                    # Spending decreases available XP by increasing spent amount
+                    if amount > current_available:
+                        await interaction.response.send_message(
+                            f"❌ Not enough XP. Available: {current_available}, Trying to spend: {amount}",
+                            ephemeral=True
+                        )
+                        return
+                    new_spent = current_spent + amount
+                    new_total = current_total
+                    action_text = f"Spent {amount} XP"
                 else:  # set
                     new_total = max(current_spent, amount)
+                    new_spent = current_spent
                     action_text = f"Set total to {amount} XP"
-                
-                new_spent = current_spent
+
                 new_available = new_total - new_spent
                 
                 # Update database
@@ -563,223 +572,6 @@ class CharacterProgression(commands.Cog):
             logger.error(f"Error in XP command: {e}")
             await interaction.response.send_message(
                 "❌ An error occurred while managing experience points",
-                ephemeral=True
-            )
-
-    @app_commands.command(name="spend_xp", description="Spend XP to improve attributes or skills")
-    @app_commands.describe(
-        improvement_type="What to improve",
-        target="Attribute or skill name",
-        new_rating="New rating (current rating + 1)"    )
-    @app_commands.choices(
-        improvement_type=[
-            app_commands.Choice(name="Attribute", value="attribute"),
-            app_commands.Choice(name="Skill", value="skill")
-        ]
-    )
-    async def spend_xp(
-        self,
-        interaction: discord.Interaction,
-        improvement_type: str,
-        target: str,
-        new_rating: int
-    ):
-        """Spend XP to improve character abilities"""
-        user_id = str(interaction.user.id)
-
-        if new_rating < 1 or new_rating > 5:
-            await interaction.response.send_message(
-                "❌ Ratings must be between 1 and 5",
-                ephemeral=True
-            )
-            return
-
-        try:
-            # Get active character
-            active_char_name = await get_active_character(user_id)
-            if not active_char_name:
-                await interaction.response.send_message(
-                    f"❌ No active character set. Use `/character` to set your active character.",
-                    ephemeral=True
-                )
-                return
-
-            char = await find_character(user_id, active_char_name)
-            if not char:
-                await interaction.response.send_message(
-                    f"❌ Could not find your active character.",
-                    ephemeral=True
-                )
-                return
-            
-            async with get_async_db() as conn:
-                # Get current XP
-                xp_data = await conn.fetchrow(
-                    "SELECT experience_total, experience_spent FROM characters WHERE user_id = $1 AND name = $2", 
-                    user_id, char['name']
-                )
-                
-                if not xp_data:
-                    await interaction.response.send_message(
-                        "❌ XP data not found. Use `/xp` command first.", 
-                        ephemeral=True
-                    )
-                    return
-                
-                current_total = xp_data['experience_total'] or 0
-                current_spent = xp_data['experience_spent'] or 0
-                available_xp = current_total - current_spent
-                
-                if improvement_type == "attribute":
-                    # Check if attribute exists and get current value
-                    target_lower = target.lower()
-                    if target_lower not in ['strength', 'dexterity', 'stamina', 'charisma', 'manipulation', 'composure', 'intelligence', 'wits', 'resolve']:
-                        await interaction.response.send_message(
-                            f"❌ **{target}** is not a valid attribute", 
-                            ephemeral=True
-                        )
-                        return
-                    
-                    char_data = await conn.fetchrow(
-                        f"SELECT {target_lower}, resolve, composure FROM characters WHERE user_id = $1 AND name = $2", 
-                        user_id, char['name']
-                    )
-                    current_rating = char_data[target_lower]
-                    
-                    if new_rating != current_rating + 1:
-                        await interaction.response.send_message(
-                            f"❌ Can only increase {target} from {current_rating} to {current_rating + 1}", 
-                            ephemeral=True
-                        )
-                        return
-                    
-                    # Calculate cost (new rating × 4)
-                    xp_cost = new_rating * 4
-                    
-                    if available_xp < xp_cost:
-                        await interaction.response.send_message(
-                            f"❌ Need {xp_cost} XP to raise {target} to {new_rating}. You have {available_xp} XP available.", 
-                            ephemeral=True
-                        )
-                        return
-                    
-                    # Apply improvement
-                    await conn.execute(f"""
-                        UPDATE characters 
-                        SET {target_lower} = $1, experience_spent = experience_spent + $2
-                        WHERE user_id = $3 AND name = $4
-                    """, new_rating, xp_cost, user_id, char['name'])
-                    
-                    # Update derived stats if needed
-                    if target_lower == 'stamina':
-                        new_health = new_rating + 3
-                        await conn.execute(
-                            "UPDATE characters SET health = $1 WHERE user_id = $2 AND name = $3", 
-                            new_health, user_id, char['name']
-                        )
-                    elif target_lower in ['resolve', 'composure']:
-                        # Recalculate willpower
-                        updated_char = await conn.fetchrow(
-                            "SELECT resolve, composure FROM characters WHERE user_id = $1 AND name = $2", 
-                            user_id, char['name']
-                        )
-                        new_willpower = updated_char['resolve'] + updated_char['composure']
-                        await conn.execute(
-                            "UPDATE characters SET willpower = $1 WHERE user_id = $2 AND name = $3", 
-                            new_willpower, user_id, char['name']
-                        )
-                    
-                    improvement_text = f"{target} {current_rating} → {new_rating}"
-                    
-                else:  # skill
-                    # Check if skill exists and get current value
-                    skill_data = await conn.fetchrow(
-                        "SELECT dots FROM skills WHERE user_id = $1 AND character_name = $2 AND skill_name = $3", 
-                        user_id, char['name'], target
-                    )
-                    
-                    if not skill_data:
-                        await interaction.response.send_message(
-                            f"❌ Skill **{target}** not found", 
-                            ephemeral=True
-                        )
-                        return
-                    
-                    current_rating = skill_data['dots']
-                    
-                    if new_rating != current_rating + 1:
-                        await interaction.response.send_message(
-                            f"❌ Can only increase {target} from {current_rating} to {current_rating + 1}", 
-                            ephemeral=True
-                        )
-                        return
-                    
-                    # Calculate cost (new rating × 2)
-                    xp_cost = new_rating * 2
-                    
-                    if available_xp < xp_cost:
-                        await interaction.response.send_message(
-                            f"❌ Need {xp_cost} XP to raise {target} to {new_rating}. You have {available_xp} XP available.", 
-                            ephemeral=True
-                        )
-                        return
-                    
-                    # Apply improvement
-                    await conn.execute("""
-                        UPDATE skills 
-                        SET dots = $1
-                        WHERE user_id = $2 AND character_name = $3 AND skill_name = $4
-                    """, new_rating, user_id, char['name'], target)
-                    
-                    await conn.execute("""
-                        UPDATE characters 
-                        SET experience_spent = experience_spent + $1
-                        WHERE user_id = $2 AND name = $3
-                    """, xp_cost, user_id, char['name'])
-                    
-                    improvement_text = f"{target} {current_rating} → {new_rating}"
-                
-                # Log the expenditure
-                await conn.execute("""
-                    INSERT INTO xp_log (user_id, character_name, action, amount, reason)
-                    VALUES ($1, $2, $3, $4, $5)
-                """, user_id, char['name'], f"Spent {xp_cost} XP", xp_cost, improvement_text)
-                
-                # Create response
-                new_available = available_xp - xp_cost
-                
-                embed = discord.Embed(
-                    title=f"🎉 {char['name']} Improved!",
-                    description=improvement_text,
-                    color=0x228B22
-                )
-                
-                embed.add_field(
-                    name="💰 XP Cost",
-                    value=f"Spent {xp_cost} XP\n{new_available} XP remaining",
-                    inline=False
-                )
-                
-                if improvement_type == "attribute":
-                    embed.add_field(
-                        name="📈 Character Development",
-                        value=f"Your {target} has increased! This may affect derived stats and dice pools.",
-                        inline=False
-                    )
-                else:
-                    embed.add_field(
-                        name="🎯 Skill Advancement", 
-                        value=f"You're becoming more proficient in {target}!",
-                        inline=False
-                    )
-                
-                await interaction.response.send_message(embed=embed)
-                logger.info(f"XP spent: {char['name']} improved {improvement_text} for {xp_cost} XP (user {user_id})")
-                
-        except Exception as e:
-            logger.error(f"Error in spend_xp command: {e}")
-            await interaction.response.send_message(
-                "❌ An error occurred while spending XP",
                 ephemeral=True
             )
 
@@ -972,36 +764,6 @@ class CharacterProgression(commands.Cog):
             )
         
         await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    # ===== AUTOCOMPLETE FUNCTIONS =====
-
-    @spend_xp.autocomplete('target')
-    async def spend_xp_target_autocomplete(
-        self,
-        interaction: discord.Interaction,
-        current: str,
-    ) -> List[app_commands.Choice[str]]:
-        """Autocomplete attribute and skill names for spending XP"""
-        improvement_type = getattr(interaction.namespace, 'improvement_type', None)
-        
-        targets = []
-        
-        if improvement_type == "attribute" or improvement_type is None:
-            attributes = ["Strength", "Dexterity", "Stamina", "Charisma", "Manipulation", "Composure", "Intelligence", "Wits", "Resolve"]
-            targets.extend(attributes)
-        
-        if improvement_type == "skill" or improvement_type is None:
-            targets.extend(ALL_SKILLS)
-        
-        filtered = [
-            target for target in targets 
-            if current.lower() in target.lower()
-        ]
-        
-        return [
-            app_commands.Choice(name=target, value=target)
-            for target in filtered[:25]
-        ]
 
 
 async def setup(bot: commands.Bot):

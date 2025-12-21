@@ -1,6 +1,6 @@
 """
 Character Management Cog for Herald Bot
-Handles basic character CRUD operations: create, delete, rename, list, sheet display
+Handles basic character CRUD operations: create, delete, list, sheet display
 
 CONVERTED TO ASYNC POSTGRESQL - All database operations now use async/await patterns
 """
@@ -398,18 +398,27 @@ class CharacterManagement(commands.Cog):
                 f"❌ Error creating character: {str(e)}", ephemeral=True
             )
 
-    @app_commands.command(name="delete", description="Delete one of your characters")
-    @app_commands.describe(name="Character name to delete")
-    async def delete_character(self, interaction: discord.Interaction, name: str):
-        """Delete a character with confirmation"""
+    @app_commands.command(name="delete", description="Delete your active character")
+    async def delete_character(self, interaction: discord.Interaction):
+        """Delete active character with confirmation"""
         user_id = str(interaction.user.id)
-        
+
         try:
-            character = await find_character(user_id, name)
-            
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No active character set. Use `/character` to set your active character first.",
+                    ephemeral=True
+                )
+                return
+
+            character = await find_character(user_id, active_char_name)
+
             if not character:
                 await interaction.response.send_message(
-                    f"⚠️ No character named **{name}** found", ephemeral=True
+                    f"{HeraldEmojis.ERROR} Active character '{active_char_name}' not found.",
+                    ephemeral=True
                 )
                 return
             
@@ -434,81 +443,6 @@ class CharacterManagement(commands.Cog):
             self.logger.error(f"Error initiating character deletion: {e}")
             await interaction.response.send_message(
                 f"❌ Error: {str(e)}", ephemeral=True
-            )
-
-    @app_commands.command(name="rename", description="Rename one of your characters")
-    @app_commands.describe(
-        old_name="Current character name",
-        new_name="New character name"
-    )
-    async def rename_character(self, interaction: discord.Interaction, old_name: str, new_name: str):
-        """Rename a character"""
-        user_id = str(interaction.user.id)
-        
-        # Validate new name
-        if len(new_name) < 2 or len(new_name) > 32:
-            await interaction.response.send_message(
-                "❌ Character name must be between 2 and 32 characters", ephemeral=True
-            )
-            return
-        
-        try:
-            
-            character = await find_character(user_id, old_name)
-            
-            if not character:
-                await interaction.response.send_message(
-                    f"⚠️ No character named **{old_name}** found", ephemeral=True
-                )
-                return
-            
-            async with get_async_db() as conn:
-                existing = await conn.fetchrow(
-                    "SELECT name FROM characters WHERE user_id = $1 AND name = $2",
-                    user_id, new_name
-                )
-                
-                if existing:
-                    await interaction.response.send_message(
-                        f"⚠️ You already have a character named **{new_name}**", ephemeral=True
-                    )
-                    return
-                
-                await conn.execute(
-                    "UPDATE characters SET name = $1 WHERE user_id = $2 AND name = $3",
-                    new_name, user_id, character['name']
-                )
-                
-                await conn.execute(
-                    "UPDATE skills SET character_name = $1 WHERE user_id = $2 AND character_name = $3",
-                    new_name, user_id, character['name']
-                )
-                
-                tables_to_update = ['equipment', 'notes', 'xp_log', 'specialties']
-                for table in tables_to_update:
-                    try:
-                        await conn.execute(
-                            f"UPDATE {table} SET character_name = $1 WHERE user_id = $2 AND character_name = $3",
-                            new_name, user_id, character['name']
-                        )
-                    except Exception:
-                        pass
-            
-            embed = discord.Embed(
-                title=f"🔸 Identity updated: {character['name']} → {new_name}",
-                description=f"**{character['name']}** is now **{new_name}**",
-                color=HeraldColors.SUCCESS
-            )
-
-            embed.set_footer(text=f"{HeraldMessages.SUCCESS_LOGGED} - All data preserved")
-            
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            self.logger.info(f"Renamed character '{character['name']}' to '{new_name}' for user {user_id}")
-            
-        except Exception as e:
-            self.logger.error(f"Error renaming character: {e}")
-            await interaction.response.send_message(
-                f"❌ Error renaming character: {str(e)}", ephemeral=True
             )
 
     @app_commands.command(name="character", description="View and switch between your characters")
@@ -573,10 +507,9 @@ class CharacterManagement(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="sheet", description="View your Hunter character sheet")
-    @app_commands.describe(name="Character name (autocompletes to your characters)")
-    async def character_sheet(self, interaction: discord.Interaction, name: str):
-        """Display a character sheet with full details using enhanced character sheet"""
+    @app_commands.command(name="sheet", description="View your active Hunter character sheet")
+    async def character_sheet(self, interaction: discord.Interaction):
+        """Display character sheet for active character"""
         user_id = str(interaction.user.id)
 
         try:
@@ -587,12 +520,22 @@ class CharacterManagement(commands.Cog):
                 get_character_perks
             )
 
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
+                return
+
             # Get character and skills
-            character, skills = await get_character_and_skills(user_id, name)
+            character, skills = await get_character_and_skills(user_id, active_char_name)
 
             if not character:
                 await interaction.response.send_message(
-                    f"⚠️ No character named **{name}** found", ephemeral=True
+                    f"{HeraldEmojis.ERROR} Active character '{active_char_name}' not found.",
+                    ephemeral=True
                 )
                 return
 
@@ -672,17 +615,6 @@ class CharacterManagement(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
-    # Autocomplete functions
-    @delete_character.autocomplete('name')
-    @rename_character.autocomplete('old_name')
-    @character_sheet.autocomplete('name')
-    async def management_character_autocomplete(
-        self,
-        interaction: discord.Interaction,
-        current: str,
-    ) -> List[app_commands.Choice[str]]:
-        """Autocomplete character names for management commands"""
-        return await character_autocomplete(interaction, current)
 
 
 async def setup(bot: commands.Bot):
