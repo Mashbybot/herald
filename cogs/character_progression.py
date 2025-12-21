@@ -591,23 +591,126 @@ class CharacterProgression(commands.Cog):
                 ephemeral=True
             )
 
+    # ===== ATTRIBUTES COMMAND =====
+
+    @app_commands.command(name="attributes", description="Set your character's attribute ratings")
+    @app_commands.describe(
+        attribute="The attribute to set",
+        dots="Rating (1-5)"
+    )
+    @app_commands.choices(attribute=[
+        app_commands.Choice(name="Strength", value="strength"),
+        app_commands.Choice(name="Dexterity", value="dexterity"),
+        app_commands.Choice(name="Stamina", value="stamina"),
+        app_commands.Choice(name="Charisma", value="charisma"),
+        app_commands.Choice(name="Manipulation", value="manipulation"),
+        app_commands.Choice(name="Composure", value="composure"),
+        app_commands.Choice(name="Intelligence", value="intelligence"),
+        app_commands.Choice(name="Wits", value="wits"),
+        app_commands.Choice(name="Resolve", value="resolve"),
+    ])
+    async def attributes(
+        self,
+        interaction: discord.Interaction,
+        attribute: str,
+        dots: int
+    ):
+        """Set a character attribute (Physical, Social, or Mental)"""
+        user_id = str(interaction.user.id)
+
+        try:
+            # Validate dots
+            if not 1 <= dots <= 5:
+                await interaction.response.send_message(
+                    f"❌ Attribute rating must be between 1 and 5 (got {dots})",
+                    ephemeral=True
+                )
+                return
+
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"❌ No active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
+                return
+
+            char = await find_character(user_id, active_char_name)
+            if not char:
+                await interaction.response.send_message(
+                    f"❌ Could not find your active character.",
+                    ephemeral=True
+                )
+                return
+
+            # Determine attribute category
+            physical_attrs = ["strength", "dexterity", "stamina"]
+            social_attrs = ["charisma", "manipulation", "composure"]
+            mental_attrs = ["intelligence", "wits", "resolve"]
+
+            if attribute in physical_attrs:
+                category = "Physical"
+                emoji = "💪"
+            elif attribute in social_attrs:
+                category = "Social"
+                emoji = "🗣️"
+            else:
+                category = "Mental"
+                emoji = "🧠"
+
+            # Update database
+            async with get_async_db() as conn:
+                await conn.execute(
+                    f"UPDATE characters SET {attribute} = $1 WHERE user_id = $2 AND name = $3",
+                    dots, user_id, char['name']
+                )
+
+            # Invalidate cache to ensure /sheet shows updated value
+            from core.character_utils import invalidate_character_cache
+            invalidate_character_cache(user_id, char['name'])
+
+            # Response
+            from core.ui_utils import create_skill_display
+            attr_display_name = attribute.title()
+
+            embed = discord.Embed(
+                title=f"✅ Attribute Updated",
+                description=f"**{char['name']}** • {category} Attribute",
+                color=0x228B22
+            )
+
+            embed.add_field(
+                name=f"{emoji} {attr_display_name}",
+                value=f"{create_skill_display(dots)} ({dots}/5)",
+                inline=False
+            )
+
+            await interaction.response.send_message(embed=embed)
+            logger.info(f"Set {attribute} to {dots} for {char['name']} (user {user_id})")
+
+        except Exception as e:
+            logger.error(f"Error in attributes command: {e}")
+            await interaction.response.send_message(
+                "❌ An error occurred while updating the attribute",
+                ephemeral=True
+            )
+
     # ===== HELP COMMAND =====
 
     @app_commands.command(name="help", description="Get help with Herald bot commands")
     @app_commands.describe(topic="Help topic to view")
     @app_commands.choices(topic=[
         app_commands.Choice(name="Getting Started", value="start"),
-        app_commands.Choice(name="Character Creation", value="creation"),
         app_commands.Choice(name="Character Management", value="management"),
         app_commands.Choice(name="Dice Rolling", value="rolling"),
-        app_commands.Choice(name="Experience Points", value="xp"),
+        app_commands.Choice(name="Skills & XP", value="progression"),
         app_commands.Choice(name="Hunter Mechanics", value="mechanics"),
-        app_commands.Choice(name="Equipment & Notes", value="extras"),
         app_commands.Choice(name="All Commands", value="commands")
     ])
     async def help_command(self, interaction: discord.Interaction, topic: str = "start"):
         """Display help information"""
-        
+
         if topic == "start":
             embed = discord.Embed(
                 title="🔸 Herald Protocol",
@@ -631,12 +734,10 @@ class CharacterProgression(commands.Cog):
                 name="🎯 Help Topics",
                 value=(
                     "Use `/help topic:TopicName` for detailed help:\n"
-                    "• **Character Creation** - Making characters\n"
-                    "• **Character Management** - Editing & organizing\n"
+                    "• **Character Management** - Creating & managing characters\n"
                     "• **Dice Rolling** - H5E dice mechanics\n"
-                    "• **Experience Points** - XP tracking & spending\n"
-                    "• **Hunter Mechanics** - Edge, Desperation, etc.\n"
-                    "• **Equipment & Notes** - Character extras\n"
+                    "• **Skills & XP** - Character progression\n"
+                    "• **Hunter Mechanics** - Desperation, Drive, etc.\n"
                     "• **All Commands** - Complete command list"
                 ),
                 inline=False
@@ -651,28 +752,37 @@ class CharacterProgression(commands.Cog):
             )
             
             embed.add_field(
-                name="🏗️ Character Creation & Management",
+                name="🏗️ Character Management",
                 value=(
                     "`/create` - Create new character\n"
                     "`/character` - Set active character\n"
-                    "`/characters` - List your characters\n"
                     "`/sheet` - View active character sheet\n"
-                    "`/delete` - Delete active character (with confirmation)"
+                    "`/delete` - Delete active character (with confirmation)\n"
+                    "`/about` - View Herald information"
                 ),
                 inline=False
             )
-            
+
             embed.add_field(
-                name="🎯 Character Development",
+                name="🎲 Dice Rolling",
                 value=(
+                    "`/roll` - Roll dice pools with modifiers\n"
+                    "`/danger` - Manage Danger rating"
+                ),
+                inline=False
+            )
+
+            embed.add_field(
+                name="🎯 Skills & Progression",
+                value=(
+                    "`/attributes` - Set attribute ratings (Strength, Dexterity, etc.)\n"
                     "`/skill_set` - Set skill dots directly\n"
                     "`/specialty` - Manage skill specialties\n"
-                    "`/xp` - View, add, spend, or set experience points\n"
-                    "`/edge` - Set or view Edge perks"
+                    "`/xp` - View, add, spend, or set experience points"
                 ),
                 inline=False
             )
-            
+
             embed.add_field(
                 name="🏹 Hunter Mechanics",
                 value=(
@@ -683,21 +793,145 @@ class CharacterProgression(commands.Cog):
                     "`/desperation` - Manage Desperation level\n"
                     "`/despair` - Enter Despair state\n"
                     "`/redemption` - Exit Despair state\n"
-                    "`/damage` - Apply damage\n"
+                    "`/damage` - Apply damage to Health/Willpower\n"
                     "`/heal` - Heal damage"
                 ),
                 inline=False
             )
         
-        else:
-            # Other topics use simplified version
+        elif topic == "management":
             embed = discord.Embed(
-                title="🏹 Herald Help",
-                description=f"Help for: {topic}",
+                title="🏗️ Character Management",
+                description="Create and manage your Hunter characters",
                 color=0x4169E1
             )
             embed.add_field(
-                name="More Topics",
+                name="`/create`",
+                value="Create a new Hunter character. You'll set name, concept, Creed, and starting attributes.",
+                inline=False
+            )
+            embed.add_field(
+                name="`/character`",
+                value="Set which character is your active character. All commands will use your active character by default.",
+                inline=False
+            )
+            embed.add_field(
+                name="`/sheet`",
+                value="View your active character's full sheet including attributes, skills, health, willpower, and all Hunter mechanics.",
+                inline=False
+            )
+            embed.add_field(
+                name="`/delete`",
+                value="Permanently delete your active character. Requires confirmation to prevent accidents.",
+                inline=False
+            )
+
+        elif topic == "rolling":
+            embed = discord.Embed(
+                title="🎲 Dice Rolling",
+                description="Hunter: The Reckoning uses pools of d10s",
+                color=0x4169E1
+            )
+            embed.add_field(
+                name="`/roll`",
+                value="Roll a dice pool. Supports modifiers like `/roll pool:5 difficulty:3 willpower:true`. "
+                      "At high Desperation (7+), you roll Desperation dice on failures!",
+                inline=False
+            )
+            embed.add_field(
+                name="`/danger`",
+                value="Manage your character's Danger rating (0-5). Danger represents ongoing threats and complications.",
+                inline=False
+            )
+            embed.add_field(
+                name="📖 Rolling Mechanics",
+                value="• Each die showing 6+ is a **success**\n"
+                      "• 10s count as **critical successes** (2 successes each)\n"
+                      "• Beat the difficulty to succeed\n"
+                      "• At Desperation 7+: Failed rolls trigger Desperation dice\n"
+                      "• Rolling 1s on Desperation dice = automatic **Despair**",
+                inline=False
+            )
+
+        elif topic == "progression":
+            embed = discord.Embed(
+                title="🎯 Skills & Character Progression",
+                description="Improve your Hunter over time",
+                color=0x4169E1
+            )
+            embed.add_field(
+                name="`/attributes`",
+                value="Set your character's attribute ratings (1-5). Attributes are:\n"
+                      "• **Physical:** Strength, Dexterity, Stamina\n"
+                      "• **Social:** Charisma, Manipulation, Composure\n"
+                      "• **Mental:** Intelligence, Wits, Resolve\n"
+                      "Example: `/attributes attribute:Strength dots:3`",
+                inline=False
+            )
+            embed.add_field(
+                name="`/skill_set`",
+                value="Set a skill's rating (0-5 dots). Example: `/skill_set skill:Investigation dots:3`",
+                inline=False
+            )
+            embed.add_field(
+                name="`/specialty`",
+                value="Add or remove skill specialties. Specialties give you bonuses when they apply. "
+                      "You can have a number of specialties equal to your skill rating (minimum 1).",
+                inline=False
+            )
+            embed.add_field(
+                name="`/xp`",
+                value="Manage experience points. Use `/xp action:view` to see your XP, `/xp action:add` to gain XP, "
+                      "or `/xp action:spend` to spend it on improvements.",
+                inline=False
+            )
+
+        elif topic == "mechanics":
+            embed = discord.Embed(
+                title="🏹 Hunter Mechanics",
+                description="Special systems for Hunter: The Reckoning",
+                color=0x4169E1
+            )
+            embed.add_field(
+                name="🔥 Desperation",
+                value="**`/desperation`** - Your Hunter's desperation level (0-10). Higher Desperation grants more power but risks losing control. "
+                      "At 7+, failed rolls trigger Desperation dice. Rolling 1s on those dice causes automatic Despair!",
+                inline=False
+            )
+            embed.add_field(
+                name="🎯 Drive, Ambition & Desire",
+                value="**`/drive`** - Your Hunter's core motivation (Protect, Avenge, etc.) and Redemption path\n"
+                      "**`/ambition`** - Long-term goal. Progress recovers Aggravated Willpower\n"
+                      "**`/desire`** - Short-term goal. Accomplishing it recovers Superficial Willpower",
+                inline=False
+            )
+            embed.add_field(
+                name="💀 Despair",
+                value="**`/despair`** - Enter Despair when your Drive fails. Your motivations ring hollow\n"
+                      "**`/redemption`** - Exit Despair by completing your Redemption. Your purpose is restored",
+                inline=False
+            )
+            embed.add_field(
+                name="🩹 Health & Willpower",
+                value="**`/damage`** - Apply Superficial or Aggravated damage to Health or Willpower\n"
+                      "**`/heal`** - Heal damage. Superficial heals faster than Aggravated",
+                inline=False
+            )
+            embed.add_field(
+                name="⚔️ Creed",
+                value="**`/creed`** - Your Hunter's philosophy (Faithful, Martial, Vigilant). Determines abilities and approach to the Hunt.",
+                inline=False
+            )
+
+        else:
+            # Fallback for unknown topics
+            embed = discord.Embed(
+                title="🏹 Herald Help",
+                description=f"Topic '{topic}' not found",
+                color=0x4169E1
+            )
+            embed.add_field(
+                name="Available Topics",
                 value="Use `/help topic:commands` to see all available commands",
                 inline=False
             )
