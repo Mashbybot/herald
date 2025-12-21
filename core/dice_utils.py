@@ -61,28 +61,30 @@ def get_die_emoji(value: int, die_type: str = "regular") -> str:
 def format_dice_display(dice_list: List[int], die_type: str = "regular") -> str:
     """
     Format a list of dice into an emoji display string
-    
+
     Args:
         dice_list: List of die values
         die_type: "regular" or "desperation"
-    
+
     Returns:
-        String of emoji representations
+        String of emoji representations (2x size - each emoji duplicated)
     """
     if not dice_list:
         return ""
-    
+
     if not isinstance(dice_list, list):
         logger.warning(f"Expected list for dice_list, got {type(dice_list)}")
         return "❓"
-    
+
     try:
         # Filter out invalid dice
         valid_dice = [d for d in dice_list if isinstance(d, int) and 1 <= d <= 10]
         if len(valid_dice) != len(dice_list):
             logger.warning(f"Filtered out {len(dice_list) - len(valid_dice)} invalid dice")
-        
-        return "".join([get_die_emoji(die, die_type) for die in valid_dice])
+
+        # Duplicate each emoji for 2x size
+        emojis = [get_die_emoji(die, die_type) * 2 for die in valid_dice]
+        return "".join(emojis)
     except Exception as e:
         logger.error(f"Error formatting dice display: {e}")
         return "❓"
