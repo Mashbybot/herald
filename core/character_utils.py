@@ -583,9 +583,9 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
 
         # Em space for alignment within column (longest in Physical: "Dexterity" = 9 chars)
         physical_attrs = [
-            f"**Strength:**\u2002{create_skill_display(strength)}",  # +1 en (test)
-            f"**Dexterity:** {create_skill_display(dexterity)}",      # +0 em (longest)
-            f"**Stamina:**\u2003{create_skill_display(stamina)}"  # +1 em
+            f"**Strength:**\u2002{create_skill_display(strength)}",  # +1 en
+            f"**Dexterity:** {create_skill_display(dexterity)}",      # +0 (longest)
+            f"**Stamina:**\u2002{create_skill_display(stamina)}"  # +1 en
         ]
 
         charisma = max(1, min(5, character.get('charisma', 1)))
@@ -594,8 +594,8 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
 
         # Em space for alignment within column (longest in Social: "Manipulation" = 12 chars)
         social_attrs = [
-            f"**Charisma:**\u2003\u2003{create_skill_display(charisma)}",  # +2 em
-            f"**Manipulation:** {create_skill_display(manipulation)}",                 # +0 em (longest)
+            f"**Charisma:**\u2003\u2003\u2002{create_skill_display(charisma)}",  # +2 em +1 en
+            f"**Manipulation:**\u2002{create_skill_display(manipulation)}",                 # +1 en
             f"**Composure:**\u2003\u2002{create_skill_display(composure)}"       # +1 em +1 en
         ]
 
@@ -605,7 +605,7 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
 
         # Em space for alignment within column (longest in Mental: "Intelligence" = 12 chars)
         mental_attrs = [
-            f"**Intelligence:** {create_skill_display(intelligence)}",                         # +0 em (longest)
+            f"**Intelligence:**\u2002{create_skill_display(intelligence)}",                         # +1 en
             f"**Wits:**\u2003\u2003\u2003\u2002{create_skill_display(wits)}",  # +3 em +1 en
             f"**Resolve:**\u2003\u2003{create_skill_display(resolve)}"               # +2 em
         ]
