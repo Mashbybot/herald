@@ -398,8 +398,7 @@ class CharacterProgression(commands.Cog):
         interaction: discord.Interaction,
         action: str,
         skill: str = None,
-        specialty: str = None,
-        character: str = None
+        specialty: str = None
     ):
         """Manage character skill specialties"""
         user_id = str(interaction.user.id)
@@ -732,18 +731,25 @@ class CharacterProgression(commands.Cog):
         interaction: discord.Interaction,
         action: str,
         amount: int = None,
-        reason: str = None,
-        character: str = None
+        reason: str = None
     ):
         """Manage character experience points"""
         user_id = str(interaction.user.id)
 
         try:
-            char = await resolve_character(user_id, character)
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
+                return
 
+            char = await find_character(user_id, active_char_name)
             if not char:
                 await interaction.response.send_message(
-                    f"❌ No character specified and no active character set. Use `/character` to set your active character.", 
+                    f"{HeraldEmojis.ERROR} Active character '{active_char_name}' not found.",
                     ephemeral=True
                 )
                 return
@@ -909,8 +915,7 @@ class CharacterProgression(commands.Cog):
         interaction: discord.Interaction,
         improvement_type: str,
         target: str,
-        new_rating: int,
-        character: str = None
+        new_rating: int
     ):
         """Spend XP to improve character abilities"""
         user_id = str(interaction.user.id)
