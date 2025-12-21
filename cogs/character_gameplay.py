@@ -208,6 +208,176 @@ class DriveSelectionView(discord.ui.View):
             )
 
 
+class EdgeSelectionView(discord.ui.View):
+    """Interactive button view for selecting Hunter Edges"""
+
+    # All 17 edges organized by category
+    EDGES = {
+        # Assets (5)
+        "Arsenal": "Access to weapons and military equipment",
+        "Fleet": "Access to vehicles and transportation",
+        "Ordnance": "Access to explosives and munitions",
+        "Library": "Access to information and research",
+        "Experimental Medicine": "Access to medical experiments and healing",
+
+        # Aptitudes (5)
+        "Improvised Gear": "Create short-lived useful tools",
+        "Global Access": "Digital larceny and hacking",
+        "Drone Jockey": "Control drones for surveillance/combat",
+        "Beast Whisperer": "Loyal animal companions",
+        "Turncoat": "Double agent abilities",
+
+        # Endowments (7)
+        "Sense the Unnatural": "Detect supernatural presence",
+        "Repel the Unnatural": "Repel supernatural creatures",
+        "Thwart the Unnatural": "Resist supernatural abilities",
+        "Artifact": "Rare supernatural relic",
+        "Cleanse the Unnatural": "Remove supernatural influence",
+        "Great Destiny": "Empowered by higher purpose",
+        "Unnatural Changes": "Use body in supernatural ways"
+    }
+
+    def __init__(self, user_id: str, character_name: str, timeout: float = 60):
+        super().__init__(timeout=timeout)
+        self.user_id = user_id
+        self.character_name = character_name
+        self.selected_edge = None
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Ensure only the original user can interact"""
+        return str(interaction.user.id) == self.user_id
+
+    # Assets Row 1 (5 edges)
+    @discord.ui.button(label="Arsenal", style=discord.ButtonStyle.secondary, emoji="🔫", row=0)
+    async def arsenal_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._add_edge(interaction, "Arsenal")
+
+    @discord.ui.button(label="Fleet", style=discord.ButtonStyle.secondary, emoji="🚗", row=0)
+    async def fleet_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._add_edge(interaction, "Fleet")
+
+    @discord.ui.button(label="Ordnance", style=discord.ButtonStyle.secondary, emoji="💣", row=0)
+    async def ordnance_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._add_edge(interaction, "Ordnance")
+
+    @discord.ui.button(label="Library", style=discord.ButtonStyle.secondary, emoji="📚", row=0)
+    async def library_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._add_edge(interaction, "Library")
+
+    @discord.ui.button(label="Exp. Medicine", style=discord.ButtonStyle.secondary, emoji="💉", row=0)
+    async def experimental_medicine_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._add_edge(interaction, "Experimental Medicine")
+
+    # Aptitudes Row 2 (5 edges)
+    @discord.ui.button(label="Improv. Gear", style=discord.ButtonStyle.secondary, emoji="🔧", row=1)
+    async def improvised_gear_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._add_edge(interaction, "Improvised Gear")
+
+    @discord.ui.button(label="Global Access", style=discord.ButtonStyle.secondary, emoji="💻", row=1)
+    async def global_access_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._add_edge(interaction, "Global Access")
+
+    @discord.ui.button(label="Drone Jockey", style=discord.ButtonStyle.secondary, emoji="🚁", row=1)
+    async def drone_jockey_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._add_edge(interaction, "Drone Jockey")
+
+    @discord.ui.button(label="Beast Whisp.", style=discord.ButtonStyle.secondary, emoji="🐺", row=1)
+    async def beast_whisperer_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._add_edge(interaction, "Beast Whisperer")
+
+    @discord.ui.button(label="Turncoat", style=discord.ButtonStyle.secondary, emoji="🎭", row=1)
+    async def turncoat_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._add_edge(interaction, "Turncoat")
+
+    # Endowments Row 3-4 (7 edges)
+    @discord.ui.button(label="Sense Unnat.", style=discord.ButtonStyle.secondary, emoji="👁️", row=2)
+    async def sense_unnatural_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._add_edge(interaction, "Sense the Unnatural")
+
+    @discord.ui.button(label="Repel Unnat.", style=discord.ButtonStyle.secondary, emoji="🛡️", row=2)
+    async def repel_unnatural_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._add_edge(interaction, "Repel the Unnatural")
+
+    @discord.ui.button(label="Thwart Unnat.", style=discord.ButtonStyle.secondary, emoji="⚡", row=2)
+    async def thwart_unnatural_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._add_edge(interaction, "Thwart the Unnatural")
+
+    @discord.ui.button(label="Artifact", style=discord.ButtonStyle.secondary, emoji="⚱️", row=2)
+    async def artifact_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._add_edge(interaction, "Artifact")
+
+    @discord.ui.button(label="Cleanse Unnat.", style=discord.ButtonStyle.secondary, emoji="✨", row=3)
+    async def cleanse_unnatural_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._add_edge(interaction, "Cleanse the Unnatural")
+
+    @discord.ui.button(label="Great Destiny", style=discord.ButtonStyle.secondary, emoji="⭐", row=3)
+    async def great_destiny_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._add_edge(interaction, "Great Destiny")
+
+    @discord.ui.button(label="Unnat. Changes", style=discord.ButtonStyle.secondary, emoji="🧬", row=3)
+    async def unnatural_changes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._add_edge(interaction, "Unnatural Changes")
+
+    async def _add_edge(self, interaction: discord.Interaction, edge_name: str):
+        """Add an edge to the character"""
+        try:
+            description = self.EDGES[edge_name]
+
+            from core.db import get_async_db
+            async with get_async_db() as conn:
+                # Check if edge already exists
+                existing = await conn.fetchrow(
+                    "SELECT edge_name FROM edges WHERE user_id = $1 AND character_name = $2 AND edge_name = $3",
+                    self.user_id, self.character_name, edge_name
+                )
+
+                if existing:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} **{self.character_name}** already has the **{edge_name}** edge!",
+                        ephemeral=True
+                    )
+                    return
+
+                # Add the edge
+                await conn.execute(
+                    "INSERT INTO edges (user_id, character_name, edge_name, description) VALUES ($1, $2, $3, $4)",
+                    self.user_id, self.character_name, edge_name, description
+                )
+
+            # Invalidate cache to ensure /sheet shows updated value
+            from core.character_utils import invalidate_character_cache
+            invalidate_character_cache(self.user_id, self.character_name)
+
+            embed = discord.Embed(
+                title=f"{HeraldEmojis.EDGE} Edge Added",
+                description=f"**{self.character_name}** gained the **{edge_name}** edge",
+                color=0xFFA500  # Orange
+            )
+
+            embed.add_field(
+                name="Description",
+                value=description,
+                inline=False
+            )
+
+            embed.set_footer(text="View all edges with /edge action:View")
+
+            # Disable all buttons
+            for item in self.children:
+                item.disabled = True
+
+            await interaction.response.edit_message(embed=embed, view=self)
+            self.selected_edge = edge_name
+            self.stop()
+
+        except Exception as e:
+            logger.error(f"Error adding edge: {e}")
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Error adding edge",
+                ephemeral=True
+            )
+
+
 class CharacterGameplay(commands.Cog):
     """Character Gameplay - H5E mechanics and combat systems"""
     
@@ -713,6 +883,168 @@ class CharacterGameplay(commands.Cog):
             self.logger.error(f"Error in creed command: {e}")
             await interaction.response.send_message(
                 f"{HeraldEmojis.ERROR} Error managing creed",
+                ephemeral=True
+            )
+
+    @app_commands.command(name="edge", description="Manage your character's Hunter Edges")
+    @app_commands.describe(
+        action="What to do with edges",
+        edge_name="Edge name (for remove action)"
+    )
+    @app_commands.choices(action=[
+        app_commands.Choice(name="View All", value="view"),
+        app_commands.Choice(name="Add", value="add"),
+        app_commands.Choice(name="Remove", value="remove")
+    ])
+    async def edge(self, interaction: discord.Interaction, action: str, edge_name: str = None):
+        """Manage character Edges (Hunter supernatural advantages)"""
+
+        user_id = str(interaction.user.id)
+
+        try:
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
+                return
+
+            char = await find_character(user_id, active_char_name)
+            if not char:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} Could not find your active character.",
+                    ephemeral=True
+                )
+                return
+
+            if action == "view":
+                # Show all current edges
+                from core.character_utils import get_character_edges
+                edges = await get_character_edges(user_id, char['name'])
+
+                embed = discord.Embed(
+                    title=f"{HeraldEmojis.EDGE} {char['name']}'s Edges",
+                    color=0xFFA500  # Orange
+                )
+
+                if edges:
+                    # Group by category
+                    assets = []
+                    aptitudes = []
+                    endowments = []
+
+                    asset_names = ["Arsenal", "Fleet", "Ordnance", "Library", "Experimental Medicine"]
+                    aptitude_names = ["Improvised Gear", "Global Access", "Drone Jockey", "Beast Whisperer", "Turncoat"]
+
+                    for edge in edges:
+                        edge_name = edge.get('edge_name', 'Unknown')
+                        edge_desc = edge.get('description', '')
+
+                        if edge_name in asset_names:
+                            assets.append(f"• **{edge_name}**")
+                        elif edge_name in aptitude_names:
+                            aptitudes.append(f"• **{edge_name}**")
+                        else:
+                            endowments.append(f"• **{edge_name}**")
+
+                    if assets:
+                        embed.add_field(
+                            name="📦 Assets",
+                            value='\n'.join(assets),
+                            inline=False
+                        )
+                    if aptitudes:
+                        embed.add_field(
+                            name="🧠 Aptitudes",
+                            value='\n'.join(aptitudes),
+                            inline=False
+                        )
+                    if endowments:
+                        embed.add_field(
+                            name="✨ Endowments",
+                            value='\n'.join(endowments),
+                            inline=False
+                        )
+                else:
+                    embed.description = "*No Edges yet*"
+                    embed.add_field(
+                        name="What are Edges?",
+                        value="Edges are supernatural advantages that put Hunters above ordinary people. Use `/edge action:Add` to gain an Edge!",
+                        inline=False
+                    )
+
+                embed.set_footer(text="Use /edge action:Add to gain new edges • /edge action:Remove to remove an edge")
+                await interaction.response.send_message(embed=embed)
+
+            elif action == "add":
+                # Show interactive button selection
+                embed = discord.Embed(
+                    title=f"{HeraldEmojis.EDGE} Select an Edge",
+                    description=f"Choose an Edge for **{char['name']}**\n\nEdges are supernatural advantages divided into Assets, Aptitudes, and Endowments.",
+                    color=0xFFA500  # Orange
+                )
+
+                embed.add_field(
+                    name="📦 Assets",
+                    value="Access to resources, tools, or contacts that ordinary citizens don't have",
+                    inline=False
+                )
+                embed.add_field(
+                    name="🧠 Aptitudes",
+                    value="Supernatural abilities that defy normal human limits",
+                    inline=False
+                )
+                embed.add_field(
+                    name="✨ Endowments",
+                    value="Supernatural objects or abilities beyond what is natural",
+                    inline=False
+                )
+
+                view = EdgeSelectionView(user_id, char['name'])
+                await interaction.response.send_message(embed=embed, view=view)
+
+            elif action == "remove":
+                # Remove edge
+                if not edge_name:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Please specify the edge name to remove",
+                        ephemeral=True
+                    )
+                    return
+
+                async with get_async_db() as conn:
+                    result = await conn.execute(
+                        "DELETE FROM edges WHERE user_id = $1 AND character_name = $2 AND edge_name = $3",
+                        user_id, char['name'], edge_name
+                    )
+
+                    # Invalidate cache to ensure /sheet shows updated value
+                    from core.character_utils import invalidate_character_cache
+                    invalidate_character_cache(user_id, char['name'])
+
+                    # Check if anything was deleted
+                    if result == "DELETE 0":
+                        await interaction.response.send_message(
+                            f"{HeraldEmojis.ERROR} Edge **{edge_name}** not found",
+                            ephemeral=True
+                        )
+                        return
+
+                    embed = discord.Embed(
+                        title=f"🗑️ Edge Removed",
+                        description=f"**{char['name']}** lost the **{edge_name}** edge",
+                        color=0xFF4500
+                    )
+
+                    await interaction.response.send_message(embed=embed)
+                    logger.info(f"Removed edge '{edge_name}' from {char['name']} (user {user_id})")
+
+        except Exception as e:
+            self.logger.error(f"Error in edge command: {e}")
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Error managing edges",
                 ephemeral=True
             )
 

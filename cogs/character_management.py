@@ -198,6 +198,72 @@ class DeleteConfirmationView(discord.ui.View):
             item.disabled = True
 
 
+class EdgeButtonView(discord.ui.View):
+    """Interactive orange button view for character edges"""
+
+    # Edge pool information for each edge
+    EDGE_POOLS = {
+        "Arsenal": "Intelligence + Craft (or Manipulation + Streetwise for contacts)",
+        "Fleet": "Manipulation + Streetwise (or Technology)",
+        "Ordnance": "Composure + Science (or Composure + Streetwise)",
+        "Library": "Resolve + Academics",
+        "Experimental Medicine": "Stamina + Medicine (or Composure + Medicine)",
+        "Improvised Gear": "Intelligence + Craft/Technology/Science",
+        "Global Access": "Intelligence + Technology",
+        "Drone Jockey": "Wits + Technology (or Intelligence + Craft)",
+        "Beast Whisperer": "Composure + Animal Ken",
+        "Turncoat": "Manipulation + Subterfuge (or Intelligence + Wits)",
+        "Sense the Unnatural": "Composure + Resolve (or Wits + Insight)",
+        "Repel the Unnatural": "Composure + Resolve (varies by Endowment)",
+        "Thwart the Unnatural": "Based on Endowment nature",
+        "Artifact": "Intelligence + Occult (or Science)",
+        "Cleanse the Unnatural": "Charisma + Persuasion (or Resolve + Science, or Manipulation + Occult)",
+        "Great Destiny": "Creates a pool of 2 dice at start of session",
+        "Unnatural Changes": "Stamina/Composure/Resolve + Insight"
+    }
+
+    def __init__(self, edges: List[dict], timeout: float = 180):
+        super().__init__(timeout=timeout)
+
+        # Dynamically create orange buttons for each edge (max 25 buttons)
+        for i, edge in enumerate(edges[:25]):  # Discord limit
+            edge_name = edge.get('edge_name', 'Unknown')
+            button = discord.ui.Button(
+                label=edge_name,
+                style=discord.ButtonStyle.secondary,  # Orange/gray style
+                custom_id=f"edge_{i}",
+                emoji="⚡",
+                row=i // 5  # 5 buttons per row
+            )
+            button.callback = self._create_edge_callback(edge)
+            self.add_item(button)
+
+    def _create_edge_callback(self, edge: dict):
+        """Create callback for edge button"""
+        async def edge_button_callback(interaction: discord.Interaction):
+            edge_name = edge.get('edge_name', 'Unknown')
+            edge_desc = edge.get('description', 'No description available')
+            edge_pool = self.EDGE_POOLS.get(edge_name, "See rulebook for dice pool")
+
+            embed = discord.Embed(
+                title=f"⚡ {edge_name}",
+                description=edge_desc,
+                color=0xFFA500  # Orange
+            )
+
+            embed.add_field(
+                name="🎲 Dice Pool",
+                value=edge_pool,
+                inline=False
+            )
+
+            embed.set_footer(text="Use /roll to make an Edge test with the appropriate pool")
+
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        return edge_button_callback
+
+
 class CharacterManagement(commands.Cog):
     """Character Management - Basic CRUD operations for Hunter characters"""
     
@@ -546,7 +612,12 @@ class CharacterManagement(commands.Cog):
             # Create enhanced character sheet with all features
             embed = create_enhanced_character_sheet(character, skills, edges, perks)
 
-            await interaction.response.send_message(embed=embed)
+            # Add edge buttons if character has edges
+            if edges:
+                view = EdgeButtonView(edges)
+                await interaction.response.send_message(embed=embed, view=view)
+            else:
+                await interaction.response.send_message(embed=embed)
 
         except Exception as e:
             self.logger.error(f"Error displaying character sheet: {e}", exc_info=True)

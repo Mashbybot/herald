@@ -787,6 +787,7 @@ class CharacterProgression(commands.Cog):
                 name="🏹 Hunter Mechanics",
                 value=(
                     "`/creed` - Set/view character Creed\n"
+                    "`/edge` - Manage character Edges\n"
                     "`/drive` - Set Drive and Redemption\n"
                     "`/ambition` - Set long-term goal\n"
                     "`/desire` - Set short-term goal\n"
@@ -920,6 +921,13 @@ class CharacterProgression(commands.Cog):
             embed.add_field(
                 name="⚔️ Creed",
                 value="**`/creed`** - Your Hunter's philosophy (Faithful, Martial, Vigilant). Determines abilities and approach to the Hunt.",
+                inline=False
+            )
+            embed.add_field(
+                name="⚡ Edges",
+                value="**`/edge`** - Supernatural advantages divided into Assets, Aptitudes, and Endowments. "
+                      "View your edges with `/edge action:View`, add new edges with `/edge action:Add`, or remove with `/edge action:Remove`. "
+                      "Orange buttons on your `/sheet` show edge details and dice pools!",
                 inline=False
             )
 
