@@ -989,7 +989,7 @@ class CharacterGameplay(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="enter_despair", description="Mark your character as entering Despair state")
+    @app_commands.command(name="despair", description="Mark your character as entering Despair state")
     async def enter_despair(self, interaction: discord.Interaction):
         """Enter Despair state - Drive becomes unusable until redeemed"""
         user_id = str(interaction.user.id)
@@ -1070,7 +1070,7 @@ class CharacterGameplay(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="exit_despair", description="Mark your character as redeemed from Despair")
+    @app_commands.command(name="redemption", description="Mark your character as redeemed from Despair")
     async def exit_despair(self, interaction: discord.Interaction):
         """Exit Despair state - Redemption completed"""
         user_id = str(interaction.user.id)

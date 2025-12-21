@@ -79,7 +79,7 @@ class HeraldBot(commands.Bot):
 
         # Load all cogs
         cogs_to_load = [
-            'cogs.system',
+            # 'cogs.system',  # Removed - Railway provides monitoring
             'cogs.character_management',
             'cogs.character_gameplay',
             'cogs.character_progression',
