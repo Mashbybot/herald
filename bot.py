@@ -86,10 +86,10 @@ class HeraldBot(commands.Bot):
             'cogs.character_inventory',
             'cogs.dice_rolling',
         ]
-        
+
         loaded_cogs = 0
         failed_cogs = 0
-        
+
         for cog in cogs_to_load:
             try:
                 await self.load_extension(cog)
@@ -98,31 +98,46 @@ class HeraldBot(commands.Bot):
             except Exception as e:
                 self.logger.error(f"❌ Failed to load {cog}: {e}")
                 failed_cogs += 1
-        
+
         self.logger.info(f"📦 Cog loading complete: {loaded_cogs} loaded, {failed_cogs} failed")
-        
-        # Sync commands
+
+        # Sync commands - manually clear Discord's cache to force parameter updates
         try:
             if GUILD_ID:
                 # Development mode - sync to specific guild (instant updates)
                 guild = discord.Object(id=GUILD_ID)
-                # Clear old commands first to ensure parameter changes take effect
-                self.tree.clear_commands(guild=guild)
-                await self.tree.sync(guild=guild)
-                # Now sync with new command signatures
+
+                # Manually clear all commands from Discord's API first
+                self.logger.info(f"🧹 Clearing old commands from Discord API...")
+                current_commands = await self.tree.fetch_commands(guild=guild)
+                for cmd in current_commands:
+                    try:
+                        await self.http.delete_guild_command(GUILD_ID, cmd.id)
+                    except:
+                        pass
+                self.logger.info(f"🗑️ Removed {len(current_commands)} old commands from Discord")
+
+                # Now sync new command signatures
                 synced = await self.tree.sync(guild=guild)
-                self.logger.info(f"⚡ Synced {len(synced)} commands to guild {GUILD_ID} (instant)")
+                self.logger.info(f"⚡ Synced {len(synced)} NEW commands to guild {GUILD_ID} (instant)")
             else:
                 # Production mode - sync globally (may take up to 1 hour)
-                # Clear old commands first to ensure parameter changes take effect
-                self.tree.clear_commands(guild=None)
-                await self.tree.sync()
-                # Now sync with new command signatures
+                self.logger.info(f"🧹 Clearing old global commands from Discord API...")
+                current_commands = await self.tree.fetch_commands()
+                for cmd in current_commands:
+                    try:
+                        await self.http.delete_global_command(cmd.id)
+                    except:
+                        pass
+                self.logger.info(f"🗑️ Removed {len(current_commands)} old global commands from Discord")
+
+                # Now sync new command signatures
                 synced = await self.tree.sync()
-                self.logger.info(f"🌍 Synced {len(synced)} commands globally")
+                self.logger.info(f"🌍 Synced {len(synced)} NEW commands globally")
                 self.logger.warning(f"⏰ Global command sync can take up to 1 hour to propagate to all servers")
         except Exception as e:
             self.logger.error(f"❌ Command sync failed: {e}")
+            self.logger.error(f"Full error: {type(e).__name__}: {str(e)}")
 
     async def on_ready(self):
         """Called when the bot has successfully connected to Discord"""
