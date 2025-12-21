@@ -667,7 +667,7 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
                     edge_text.append(f"**{edge_name}**")
 
             embed.add_field(
-                name=f"{HeraldEmojis.EDGE} Edge Abilities",
+                name="__Edge Abilities__",
                 value="\n".join(edge_text),
                 inline=False
             )

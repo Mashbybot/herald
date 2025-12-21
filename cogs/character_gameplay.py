@@ -248,73 +248,73 @@ class EdgeSelectionView(discord.ui.View):
         return str(interaction.user.id) == self.user_id
 
     # Assets Row 1 (5 edges)
-    @discord.ui.button(label="Arsenal", style=discord.ButtonStyle.secondary, emoji="🔫", row=0)
+    @discord.ui.button(label="Arsenal", style=discord.ButtonStyle.secondary, row=0)
     async def arsenal_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._add_edge(interaction, "Arsenal")
 
-    @discord.ui.button(label="Fleet", style=discord.ButtonStyle.secondary, emoji="🚗", row=0)
+    @discord.ui.button(label="Fleet", style=discord.ButtonStyle.secondary, row=0)
     async def fleet_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._add_edge(interaction, "Fleet")
 
-    @discord.ui.button(label="Ordnance", style=discord.ButtonStyle.secondary, emoji="💣", row=0)
+    @discord.ui.button(label="Ordnance", style=discord.ButtonStyle.secondary, row=0)
     async def ordnance_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._add_edge(interaction, "Ordnance")
 
-    @discord.ui.button(label="Library", style=discord.ButtonStyle.secondary, emoji="📚", row=0)
+    @discord.ui.button(label="Library", style=discord.ButtonStyle.secondary, row=0)
     async def library_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._add_edge(interaction, "Library")
 
-    @discord.ui.button(label="Exp. Medicine", style=discord.ButtonStyle.secondary, emoji="💉", row=0)
+    @discord.ui.button(label="Experimental Medicine", style=discord.ButtonStyle.secondary, row=0)
     async def experimental_medicine_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._add_edge(interaction, "Experimental Medicine")
 
     # Aptitudes Row 2 (5 edges)
-    @discord.ui.button(label="Improv. Gear", style=discord.ButtonStyle.secondary, emoji="🔧", row=1)
+    @discord.ui.button(label="Improvised Gear", style=discord.ButtonStyle.secondary, row=1)
     async def improvised_gear_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._add_edge(interaction, "Improvised Gear")
 
-    @discord.ui.button(label="Global Access", style=discord.ButtonStyle.secondary, emoji="💻", row=1)
+    @discord.ui.button(label="Global Access", style=discord.ButtonStyle.secondary, row=1)
     async def global_access_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._add_edge(interaction, "Global Access")
 
-    @discord.ui.button(label="Drone Jockey", style=discord.ButtonStyle.secondary, emoji="🚁", row=1)
+    @discord.ui.button(label="Drone Jockey", style=discord.ButtonStyle.secondary, row=1)
     async def drone_jockey_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._add_edge(interaction, "Drone Jockey")
 
-    @discord.ui.button(label="Beast Whisp.", style=discord.ButtonStyle.secondary, emoji="🐺", row=1)
+    @discord.ui.button(label="Beast Whisperer", style=discord.ButtonStyle.secondary, row=1)
     async def beast_whisperer_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._add_edge(interaction, "Beast Whisperer")
 
-    @discord.ui.button(label="Turncoat", style=discord.ButtonStyle.secondary, emoji="🎭", row=1)
+    @discord.ui.button(label="Turncoat", style=discord.ButtonStyle.secondary, row=1)
     async def turncoat_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._add_edge(interaction, "Turncoat")
 
     # Endowments Row 3-4 (7 edges)
-    @discord.ui.button(label="Sense Unnat.", style=discord.ButtonStyle.secondary, emoji="👁️", row=2)
+    @discord.ui.button(label="Sense the Unnatural", style=discord.ButtonStyle.secondary, row=2)
     async def sense_unnatural_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._add_edge(interaction, "Sense the Unnatural")
 
-    @discord.ui.button(label="Repel Unnat.", style=discord.ButtonStyle.secondary, emoji="🛡️", row=2)
+    @discord.ui.button(label="Repel the Unnatural", style=discord.ButtonStyle.secondary, row=2)
     async def repel_unnatural_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._add_edge(interaction, "Repel the Unnatural")
 
-    @discord.ui.button(label="Thwart Unnat.", style=discord.ButtonStyle.secondary, emoji="⚡", row=2)
+    @discord.ui.button(label="Thwart the Unnatural", style=discord.ButtonStyle.secondary, row=2)
     async def thwart_unnatural_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._add_edge(interaction, "Thwart the Unnatural")
 
-    @discord.ui.button(label="Artifact", style=discord.ButtonStyle.secondary, emoji="⚱️", row=2)
+    @discord.ui.button(label="Artifact", style=discord.ButtonStyle.secondary, row=2)
     async def artifact_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._add_edge(interaction, "Artifact")
 
-    @discord.ui.button(label="Cleanse Unnat.", style=discord.ButtonStyle.secondary, emoji="✨", row=3)
+    @discord.ui.button(label="Cleanse the Unnatural", style=discord.ButtonStyle.secondary, row=3)
     async def cleanse_unnatural_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._add_edge(interaction, "Cleanse the Unnatural")
 
-    @discord.ui.button(label="Great Destiny", style=discord.ButtonStyle.secondary, emoji="⭐", row=3)
+    @discord.ui.button(label="Great Destiny", style=discord.ButtonStyle.secondary, row=3)
     async def great_destiny_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._add_edge(interaction, "Great Destiny")
 
-    @discord.ui.button(label="Unnat. Changes", style=discord.ButtonStyle.secondary, emoji="🧬", row=3)
+    @discord.ui.button(label="Unnatural Changes", style=discord.ButtonStyle.secondary, row=3)
     async def unnatural_changes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._add_edge(interaction, "Unnatural Changes")
 

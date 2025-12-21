@@ -612,12 +612,7 @@ class CharacterManagement(commands.Cog):
             # Create enhanced character sheet with all features
             embed = create_enhanced_character_sheet(character, skills, edges, perks)
 
-            # Add edge buttons if character has edges
-            if edges:
-                view = EdgeButtonView(edges)
-                await interaction.response.send_message(embed=embed, view=view)
-            else:
-                await interaction.response.send_message(embed=embed)
+            await interaction.response.send_message(embed=embed)
 
         except Exception as e:
             self.logger.error(f"Error displaying character sheet: {e}", exc_info=True)
