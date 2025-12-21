@@ -603,9 +603,10 @@ class CharacterProgression(commands.Cog):
                 name="🔸 Operations available",
                 value=(
                     "1. Create a character: `/create`\n"
-                    "2. View character sheet: `/sheet`\n"
-                    "3. Roll dice: `/roll` or `/roll_char`\n"
-                    "4. Manage character: Use various commands"
+                    "2. Set active character: `/character`\n"
+                    "3. View character sheet: `/sheet`\n"
+                    "4. Roll dice: `/roll` or `/danger`\n"
+                    "5. Manage your active character with various commands"
                 ),
                 inline=False
             )
@@ -637,10 +638,10 @@ class CharacterProgression(commands.Cog):
                 name="🏗️ Character Creation & Management",
                 value=(
                     "`/create` - Create new character\n"
-                    "`/delete` - Delete character (with confirmation)\n"
-                    "`/rename` - Rename character\n"
+                    "`/character` - Set active character\n"
                     "`/characters` - List your characters\n"
-                    "`/sheet` - View character sheet"
+                    "`/sheet` - View active character sheet\n"
+                    "`/delete` - Delete active character (with confirmation)"
                 ),
                 inline=False
             )
@@ -648,12 +649,10 @@ class CharacterProgression(commands.Cog):
             embed.add_field(
                 name="🎯 Character Development",
                 value=(
-                    "`/skill_set` - Set skill dots\n"
-                    "`/skill_template` - Apply H5E skill templates\n"
+                    "`/skill_set` - Set skill dots directly\n"
                     "`/specialty` - Manage skill specialties\n"
-                    "`/xp` - Manage experience points\n"
-                    "`/spend_xp` - Spend XP for improvements\n"
-                    "`/xp_log` - View XP transaction history"
+                    "`/xp` - View, add, spend, or set experience points\n"
+                    "`/edge` - Set or view Edge perks"
                 ),
                 inline=False
             )
@@ -661,9 +660,13 @@ class CharacterProgression(commands.Cog):
             embed.add_field(
                 name="🏹 Hunter Mechanics",
                 value=(
-                    "`/edge` - Manage Edge rating\n"
-                    "`/desperation` - Manage Desperation level\n"
                     "`/creed` - Set/view character Creed\n"
+                    "`/drive` - Set Drive and Redemption\n"
+                    "`/ambition` - Set long-term goal\n"
+                    "`/desire` - Set short-term goal\n"
+                    "`/desperation` - Manage Desperation level\n"
+                    "`/despair` - Enter Despair state\n"
+                    "`/redemption` - Exit Despair state\n"
                     "`/damage` - Apply damage\n"
                     "`/heal` - Heal damage"
                 ),

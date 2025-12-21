@@ -551,13 +551,17 @@ class CharacterGameplay(commands.Cog):
                     "UPDATE characters SET desperation = $1 WHERE user_id = $2 AND name = $3",
                     new_desperation, user_id, char['name']
                 )
-            
+
+            # Invalidate cache to ensure /sheet shows updated value
+            from core.character_utils import invalidate_character_cache
+            invalidate_character_cache(user_id, char['name'])
+
             # Create response
             desperation_bar = create_desperation_bar(new_desperation)
-            
+
             embed = discord.Embed(
                 title=f"{HeraldEmojis.DESPERATION} Desperation Updated",
-                description=f"😰 Desperation activated: {current_desperation} → {new_desperation}\n{HeraldMessages.PATTERN_LOGGED}: Risk increases with reward\n{desperation_bar}",
+                description=f"{HeraldMessages.PATTERN_LOGGED}: Risk increases with reward\n\n{desperation_bar}",
                 color=0x8B0000 if new_desperation >= 7 else 0xFF4500 if new_desperation >= 4 else 0x4169E1
             )
 
@@ -750,8 +754,8 @@ class CharacterGameplay(commands.Cog):
                 else:
                     embed.description = "*No Ambition set yet*"
                     embed.add_field(
-                        name="Set Your Ambition", 
-                        value="Use `/ambition character:Name ambition:\"Your long-term goal\"` to set an ambitious goal for your Hunter.\n\n**Examples:**\n• Destroy the vampire nest in the city\n• Find out what happened to my family\n• Prove the supernatural exists to the world", 
+                        name="Set Your Ambition",
+                        value="Use `/ambition ambition:\"Your long-term goal\"` to set an ambitious goal for your Hunter.\n\n**Examples:**\n• Destroy the vampire nest in the city\n• Find out what happened to my family\n• Prove the supernatural exists to the world",
                         inline=False
                     )
                 
@@ -839,8 +843,8 @@ class CharacterGameplay(commands.Cog):
                 else:
                     embed.description = "*No Desire set yet*"
                     embed.add_field(
-                        name="Set Your Desire", 
-                        value="Use `/desire character:Name desire:\"Your short-term goal\"` to set a desire for this session.\n\n**Examples:**\n• Find evidence of the creature's lair\n• Protect an innocent from harm\n• Get revenge on a specific enemy", 
+                        name="Set Your Desire",
+                        value="Use `/desire desire:\"Your short-term goal\"` to set a desire for this session.\n\n**Examples:**\n• Find evidence of the creature's lair\n• Protect an innocent from harm\n• Get revenge on a specific enemy",
                         inline=False
                     )
                 
@@ -853,7 +857,11 @@ class CharacterGameplay(commands.Cog):
                     "UPDATE characters SET desire = $1 WHERE user_id = $2 AND name = $3",
                     desire, user_id, char['name']
                 )
-            
+
+            # Invalidate cache to ensure /sheet shows updated value
+            from core.character_utils import invalidate_character_cache
+            invalidate_character_cache(user_id, char['name'])
+
             embed = discord.Embed(
                 title=f"{HeraldEmojis.DESIRE} Desire Set",
                 color=0x4169E1
@@ -1050,7 +1058,7 @@ class CharacterGameplay(commands.Cog):
             else:
                 embed.add_field(
                     name=f"{HeraldEmojis.WARNING} No Redemption Set",
-                    value="Use `/drive character:Name redemption:\"method\"` to set how this character can redeem their Drive",
+                    value="Set your Drive using `/drive action:Set` - Redemption will be assigned automatically based on your chosen Drive",
                     inline=False
                 )
 
