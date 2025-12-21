@@ -666,6 +666,27 @@ class CharacterProgression(commands.Cog):
                     dots, user_id, char['name']
                 )
 
+                # Recalculate derived stats if needed
+                if attribute == "stamina":
+                    # Health = Stamina + 3
+                    new_health = dots + 3
+                    await conn.execute(
+                        "UPDATE characters SET health = $1 WHERE user_id = $2 AND name = $3",
+                        new_health, user_id, char['name']
+                    )
+                elif attribute in ["composure", "resolve"]:
+                    # Willpower = Composure + Resolve
+                    # Need to fetch the other attribute
+                    updated_char = await conn.fetchrow(
+                        "SELECT composure, resolve FROM characters WHERE user_id = $1 AND name = $2",
+                        user_id, char['name']
+                    )
+                    new_willpower = updated_char['composure'] + updated_char['resolve']
+                    await conn.execute(
+                        "UPDATE characters SET willpower = $1 WHERE user_id = $2 AND name = $3",
+                        new_willpower, user_id, char['name']
+                    )
+
             # Invalidate cache to ensure /sheet shows updated value
             from core.character_utils import invalidate_character_cache
             invalidate_character_cache(user_id, char['name'])
