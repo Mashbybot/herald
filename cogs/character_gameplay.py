@@ -1382,8 +1382,8 @@ class CharacterGameplay(commands.Cog):
             # Mark character as in Despair
             async with get_async_db() as conn:
                 await conn.execute(
-                    "UPDATE characters SET in_despair = TRUE WHERE user_id = $1 AND name = $2",
-                    user_id, char['name']
+                    "UPDATE characters SET in_despair = $1 WHERE user_id = $2 AND name = $3",
+                    True, user_id, char['name']
                 )
 
             # Invalidate cache to ensure /sheet shows updated value
@@ -1467,8 +1467,8 @@ class CharacterGameplay(commands.Cog):
             # Mark character as redeemed
             async with get_async_db() as conn:
                 await conn.execute(
-                    "UPDATE characters SET in_despair = FALSE WHERE user_id = $1 AND name = $2",
-                    user_id, char['name']
+                    "UPDATE characters SET in_despair = $1 WHERE user_id = $2 AND name = $3",
+                    False, user_id, char['name']
                 )
 
             # Invalidate cache to ensure /sheet shows updated value
