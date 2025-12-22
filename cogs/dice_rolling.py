@@ -26,7 +26,7 @@ logger = logging.getLogger('Herald.Dice')
 
 # Dice result thumbnails
 THUMBNAIL_URLS = {
-    "success": "https://media.discordapp.net/attachments/1416859395962310716/1452436426892378223/Dice_Critical.png?ex=6949ce55&is=69487cd5&hm=3b7b7d30205494d0875766cdcd7c036f8c57efb6fe836b8dece0add206c5dbd4&=&format=webp&quality=lossless",
+    "success": "https://media.discordapp.net/attachments/1416859395962310716/1452436428180164850/Dice_Success.png?ex=694a7715&is=69492595&hm=0e7d686c30822ea36d26eff966680e64b1a0e4c95da6d64b09da1f38bfa06101&=&format=webp&quality=lossless",
     "failure": "https://media.discordapp.net/attachments/1416859395962310716/1452436427265806611/Dice_Failure.png?ex=6949ce55&is=69487cd5&hm=fa691cde54fcaf134758e7dc7e1ef4162953dc2671c327996e1e3912161c49ad&=&format=webp&quality=lossless",
     "critical": "https://media.discordapp.net/attachments/1416859395962310716/1452436426892378223/Dice_Critical.png?ex=6949ce55&is=69487cd5&hm=3b7b7d30205494d0875766cdcd7c036f8c57efb6fe836b8dece0add206c5dbd4&=&format=webp&quality=lossless",
     "overreach": "https://media.discordapp.net/attachments/1416859395962310716/1452436427685101750/Dice_Overreach.png?ex=6949ce55&is=69487cd5&hm=1c2991f783cf45a84fbcabf14b554d45c231e9f8c236fe268e09b726d38c876f&=&format=webp&quality=lossless"
