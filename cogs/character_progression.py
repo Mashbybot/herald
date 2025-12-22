@@ -809,6 +809,7 @@ class CharacterProgression(commands.Cog):
                 value=(
                     "`/creed` - Set/view character Creed\n"
                     "`/edge` - Manage character Edges\n"
+                    "`/perks` - Manage Edge Perks\n"
                     "`/drive` - Set Drive and Redemption\n"
                     "`/ambition` - Set long-term goal\n"
                     "`/desire` - Set short-term goal\n"
@@ -949,6 +950,13 @@ class CharacterProgression(commands.Cog):
                 value="**`/edge`** - Supernatural advantages divided into Assets, Aptitudes, and Endowments. "
                       "View your edges with `/edge action:View`, add new edges with `/edge action:Add`, or remove with `/edge action:Remove`. "
                       "Orange buttons on your `/sheet` show edge details and dice pools!",
+                inline=False
+            )
+            embed.add_field(
+                name="🎭 Perks",
+                value="**`/perks`** - Special abilities tied to your Edges. Each Edge has unique Perks you can gain. "
+                      "View your perks with `/perks action:View`, add new perks with `/perks action:Add edge_name:\"Edge Name\"`, "
+                      "or remove with `/perks action:Remove perk_name:\"Perk Name\"`. Perks appear bulleted under their edges on your `/sheet`!",
                 inline=False
             )
 

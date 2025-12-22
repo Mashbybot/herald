@@ -1048,6 +1048,292 @@ class CharacterGameplay(commands.Cog):
                 ephemeral=True
             )
 
+    @app_commands.command(name="perks", description="Manage your character's Edge Perks")
+    @app_commands.describe(
+        action="What to do with perks",
+        edge_name="Edge to view perks for (for add action)",
+        perk_name="Perk name (for add/remove actions)"
+    )
+    @app_commands.choices(action=[
+        app_commands.Choice(name="View All", value="view"),
+        app_commands.Choice(name="Add", value="add"),
+        app_commands.Choice(name="Remove", value="remove")
+    ])
+    async def perks(self, interaction: discord.Interaction, action: str, edge_name: str = None, perk_name: str = None):
+        """Manage character Perks (Hunter advantages from Edges)"""
+
+        user_id = str(interaction.user.id)
+
+        try:
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
+                return
+
+            char = await find_character(user_id, active_char_name)
+            if not char:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} Could not find your active character.",
+                    ephemeral=True
+                )
+                return
+
+            # Get character's edges
+            from core.character_utils import get_character_edges, get_character_perks
+            edges = await get_character_edges(user_id, char['name'])
+
+            if not edges and action != "view":
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} **{char['name']}** has no Edges yet! Use `/edge action:Add` to gain an Edge before adding Perks.",
+                    ephemeral=True
+                )
+                return
+
+            if action == "view":
+                # Show all current perks grouped by edge
+                perks = await get_character_perks(user_id, char['name'])
+
+                embed = discord.Embed(
+                    title=f"🎭 {char['name']}'s Perks",
+                    color=0xFFA500  # Orange
+                )
+
+                if perks:
+                    # Group perks by edge
+                    from collections import defaultdict
+                    perks_by_edge = defaultdict(list)
+
+                    for perk in perks:
+                        edge = perk.get('edge_name', 'Unknown')
+                        perk_nm = perk.get('perk_name', 'Unknown')
+                        perks_by_edge[edge].append(perk_nm)
+
+                    # Display perks grouped by edge
+                    for edge, perk_list in sorted(perks_by_edge.items()):
+                        perk_display = '\n'.join([f"• {p}" for p in perk_list])
+                        embed.add_field(
+                            name=f"⚡ {edge}",
+                            value=perk_display,
+                            inline=False
+                        )
+                else:
+                    embed.description = "*No Perks yet*"
+
+                    if edges:
+                        edge_list = ", ".join([e['edge_name'] for e in edges])
+                        embed.add_field(
+                            name="Your Edges",
+                            value=f"You have the following Edges: **{edge_list}**\n\nUse `/perks action:Add` to gain Perks for your Edges!",
+                            inline=False
+                        )
+                    else:
+                        embed.add_field(
+                            name="What are Perks?",
+                            value="Perks are special abilities tied to your Edges. First gain an Edge with `/edge action:Add`, then gain Perks for that Edge!",
+                            inline=False
+                        )
+
+                embed.set_footer(text="Use /perks action:Add to gain new perks • /perks action:Remove to remove a perk")
+                await interaction.response.send_message(embed=embed)
+
+            elif action == "add":
+                # Show available perks for character's edges
+                if not edge_name:
+                    # Show edges to choose from
+                    embed = discord.Embed(
+                        title=f"🎭 Select an Edge",
+                        description=f"Choose which Edge you want to add a Perk for:\n\n**Your Edges:**",
+                        color=0xFFA500
+                    )
+
+                    edge_list = []
+                    for edge in edges:
+                        edge_list.append(f"⚡ **{edge['edge_name']}**")
+
+                    embed.add_field(
+                        name="\u200b",
+                        value="\n".join(edge_list),
+                        inline=False
+                    )
+
+                    embed.set_footer(text="Use /perks action:Add edge_name:\"Edge Name\" perk_name:\"Perk Name\" to add a perk")
+                    await interaction.response.send_message(embed=embed)
+                    return
+
+                # Verify the character has this edge
+                edge_names = [e['edge_name'] for e in edges]
+                if edge_name not in edge_names:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} **{char['name']}** does not have the **{edge_name}** Edge!",
+                        ephemeral=True
+                    )
+                    return
+
+                if not perk_name:
+                    # Show available perks for this edge
+                    from data.perks import get_perks_for_edge
+                    available_perks = get_perks_for_edge(edge_name)
+
+                    if not available_perks:
+                        await interaction.response.send_message(
+                            f"{HeraldEmojis.ERROR} No perks found for **{edge_name}**",
+                            ephemeral=True
+                        )
+                        return
+
+                    embed = discord.Embed(
+                        title=f"🎭 Available Perks for {edge_name}",
+                        description=f"Choose a Perk to add:",
+                        color=0xFFA500
+                    )
+
+                    # Get character's current perks for this edge
+                    current_perks = await get_character_perks(user_id, char['name'])
+                    current_perk_names = [p['perk_name'] for p in current_perks if p['edge_name'] == edge_name]
+
+                    perk_list = []
+                    for perk_nm, perk_desc in available_perks.items():
+                        if perk_nm in current_perk_names:
+                            perk_list.append(f"✅ **{perk_nm}** (already have)")
+                        else:
+                            perk_list.append(f"• **{perk_nm}**")
+
+                    # Discord has a 1024 character limit per field, so we might need to split
+                    perk_display = "\n".join(perk_list)
+                    if len(perk_display) > 1024:
+                        # Split into multiple fields
+                        chunks = []
+                        current_chunk = []
+                        current_length = 0
+
+                        for perk_line in perk_list:
+                            if current_length + len(perk_line) + 1 > 1024:
+                                chunks.append("\n".join(current_chunk))
+                                current_chunk = [perk_line]
+                                current_length = len(perk_line)
+                            else:
+                                current_chunk.append(perk_line)
+                                current_length += len(perk_line) + 1
+
+                        if current_chunk:
+                            chunks.append("\n".join(current_chunk))
+
+                        for i, chunk in enumerate(chunks):
+                            embed.add_field(
+                                name=f"Perks (Part {i+1})" if i > 0 else "Perks",
+                                value=chunk,
+                                inline=False
+                            )
+                    else:
+                        embed.add_field(
+                            name="Perks",
+                            value=perk_display,
+                            inline=False
+                        )
+
+                    embed.set_footer(text=f"Use /perks action:Add edge_name:\"{edge_name}\" perk_name:\"Perk Name\" to add a perk")
+                    await interaction.response.send_message(embed=embed)
+                    return
+
+                # Add the perk
+                from data.perks import get_perk_description
+                perk_description = get_perk_description(edge_name, perk_name)
+
+                if not perk_description:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} **{perk_name}** is not a valid perk for **{edge_name}**",
+                        ephemeral=True
+                    )
+                    return
+
+                async with get_async_db() as conn:
+                    # Check if perk already exists
+                    existing = await conn.fetchrow(
+                        "SELECT perk_name FROM perks WHERE user_id = $1 AND character_name = $2 AND perk_name = $3",
+                        user_id, char['name'], perk_name
+                    )
+
+                    if existing:
+                        await interaction.response.send_message(
+                            f"{HeraldEmojis.ERROR} **{char['name']}** already has the **{perk_name}** perk!",
+                            ephemeral=True
+                        )
+                        return
+
+                    # Add the perk
+                    await conn.execute(
+                        "INSERT INTO perks (user_id, character_name, edge_name, perk_name, description) VALUES ($1, $2, $3, $4, $5)",
+                        user_id, char['name'], edge_name, perk_name, perk_description
+                    )
+
+                # Invalidate cache to ensure /sheet shows updated value
+                from core.character_utils import invalidate_character_cache
+                invalidate_character_cache(user_id, char['name'])
+
+                embed = discord.Embed(
+                    title=f"🎭 Perk Added",
+                    description=f"**{char['name']}** gained the **{perk_name}** perk",
+                    color=0xFFA500
+                )
+
+                embed.add_field(
+                    name=f"⚡ {edge_name}",
+                    value=f"**{perk_name}**\n*{perk_description}*",
+                    inline=False
+                )
+
+                embed.set_footer(text="View all perks with /perks action:View")
+
+                await interaction.response.send_message(embed=embed)
+                logger.info(f"Added perk '{perk_name}' ({edge_name}) to {char['name']} (user {user_id})")
+
+            elif action == "remove":
+                # Remove perk
+                if not perk_name:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Please specify the perk name to remove",
+                        ephemeral=True
+                    )
+                    return
+
+                async with get_async_db() as conn:
+                    result = await conn.execute(
+                        "DELETE FROM perks WHERE user_id = $1 AND character_name = $2 AND perk_name = $3",
+                        user_id, char['name'], perk_name
+                    )
+
+                    # Invalidate cache to ensure /sheet shows updated value
+                    from core.character_utils import invalidate_character_cache
+                    invalidate_character_cache(user_id, char['name'])
+
+                    # Check if anything was deleted
+                    if result == "DELETE 0":
+                        await interaction.response.send_message(
+                            f"{HeraldEmojis.ERROR} Perk **{perk_name}** not found",
+                            ephemeral=True
+                        )
+                        return
+
+                    embed = discord.Embed(
+                        title=f"🗑️ Perk Removed",
+                        description=f"**{char['name']}** lost the **{perk_name}** perk",
+                        color=0xFF4500
+                    )
+
+                    await interaction.response.send_message(embed=embed)
+                    logger.info(f"Removed perk '{perk_name}' from {char['name']} (user {user_id})")
+
+        except Exception as e:
+            self.logger.error(f"Error in perks command: {e}")
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Error managing perks",
+                ephemeral=True
+            )
+
     @app_commands.command(name="ambition", description="View or set your character's Ambition")
     @app_commands.describe(
         ambition="Long-term goal (leave empty to view current ambition)"

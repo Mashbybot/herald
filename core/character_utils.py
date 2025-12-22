@@ -250,12 +250,12 @@ async def get_character_edges(user_id: str, character_name: str) -> List[Dict[st
 
 
 async def get_character_perks(user_id: str, character_name: str) -> List[Dict[str, Any]]:
-    """Get character's Perk abilities."""
+    """Get character's Perk abilities with their associated edges."""
     try:
         from core.db import get_async_db
         async with get_async_db() as conn:
             perk_rows = await conn.fetch(
-                "SELECT perk_name, description FROM perks WHERE user_id = $1 AND character_name = $2 ORDER BY perk_name",
+                "SELECT edge_name, perk_name, description FROM perks WHERE user_id = $1 AND character_name = $2 ORDER BY edge_name, perk_name",
                 user_id, character_name
             )
             return [dict(row) for row in perk_rows]
@@ -656,37 +656,39 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         embed.add_field(name="\u200b", value="\u200b", inline=False)
 
         # === EDGE AND PERKS (Hunter Abilities) ===
+        # Group perks by edge for display
+        perks_by_edge = {}
+        for perk in perks:
+            edge_name = perk.get('edge_name', 'Unknown')
+            if edge_name not in perks_by_edge:
+                perks_by_edge[edge_name] = []
+            perks_by_edge[edge_name].append(perk)
+
         if edges:
-            edge_text = []
             for edge in edges:
                 edge_name = edge.get('edge_name', 'Unknown')
                 edge_desc = edge.get('description', '')
+
+                # Start with edge description
+                edge_display = []
                 if edge_desc:
-                    edge_text.append(f"**{edge_name}:** {edge_desc}")
-                else:
-                    edge_text.append(f"**{edge_name}**")
+                    edge_display.append(f"*{edge_desc}*")
 
-            embed.add_field(
-                name="__Edge Abilities__",
-                value="\n".join(edge_text),
-                inline=False
-            )
+                # Add associated perks under this edge
+                if edge_name in perks_by_edge:
+                    edge_display.append("")  # Blank line
+                    edge_display.append("**Perks:**")
+                    for perk in perks_by_edge[edge_name]:
+                        perk_name = perk.get('perk_name', 'Unknown')
+                        edge_display.append(f"• {perk_name}")
 
-        if perks:
-            perk_text = []
-            for perk in perks:
-                perk_name = perk.get('perk_name', 'Unknown')
-                perk_desc = perk.get('description', '')
-                if perk_desc:
-                    perk_text.append(f"**{perk_name}:** {perk_desc}")
-                else:
-                    perk_text.append(f"**{perk_name}**")
-
-            embed.add_field(
-                name="🎭 Perks",
-                value="\n".join(perk_text),
-                inline=False
-            )
+                # Only display if there's content
+                if edge_display or not edge_desc:
+                    embed.add_field(
+                        name=f"__⚡ {edge_name}__",
+                        value="\n".join(edge_display) if edge_display else "*No description*",
+                        inline=False
+                    )
 
         # Footer with helpful tips
         embed.set_footer(text="💡 Use /damage and /heal to manage health • Use /creed and /drive to set your Hunter's path")

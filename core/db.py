@@ -171,18 +171,32 @@ async def run_postgresql_migrations():
             );
         """)
 
-        # Perks table (Hunter abilities)
+        # Perks table (Hunter abilities associated with Edges)
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS perks (
                 id SERIAL PRIMARY KEY,
                 user_id TEXT NOT NULL,
                 character_name TEXT NOT NULL,
+                edge_name TEXT NOT NULL,
                 perk_name TEXT NOT NULL,
                 description TEXT,
                 created_at TIMESTAMP DEFAULT NOW(),
                 UNIQUE(user_id, character_name, perk_name),
                 FOREIGN KEY (user_id, character_name) REFERENCES characters(user_id, name) ON DELETE CASCADE
             );
+        """)
+
+        # Migration: Add edge_name column to perks table if it doesn't exist
+        await conn.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'perks' AND column_name = 'edge_name'
+                ) THEN
+                    ALTER TABLE perks ADD COLUMN edge_name TEXT NOT NULL DEFAULT '';
+                END IF;
+            END $$;
         """)
 
         # User settings table (active character tracking)
