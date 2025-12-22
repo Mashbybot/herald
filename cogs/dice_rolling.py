@@ -64,21 +64,22 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
     margin_text = format_margin_display(margin)
 
     # === STEP 2.5: Determine thumbnail based on result type ===
-    # Only show thumbnails for special outcomes (critical/failure/overreach)
     thumbnail_url = None
     if is_automatic_despair:
-        # Automatic despair gets failure thumbnail
-        thumbnail_url = THUMBNAIL_URLS.get("failure")
+        # Automatic despair uses overreach thumbnail
+        thumbnail_url = THUMBNAIL_URLS.get("overreach")
     elif result.has_overreach or result.messy_critical:
         # Overreach choice or messy critical
         thumbnail_url = THUMBNAIL_URLS.get("overreach")
     elif result.crits > 0:
         # Critical win (at least one pair of 10s)
         thumbnail_url = THUMBNAIL_URLS.get("critical")
-    elif result.total_successes == 0:
+    elif result.total_successes > 0:
+        # Regular success
+        thumbnail_url = THUMBNAIL_URLS.get("success")
+    else:
         # Total failure
         thumbnail_url = THUMBNAIL_URLS.get("failure")
-    # Regular success gets no thumbnail to make criticals stand out
 
     # === STEP 3: Create embed with clean title and thumbnail ===
     if character_name:
