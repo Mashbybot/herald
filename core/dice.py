@@ -23,9 +23,10 @@ class DiceResult:
         return sum(1 for die in self.all_dice if die >= 6)
 
     def _count_crits(self) -> int:
-        """Count critical successes (pairs of 10s = +1 success each pair)"""
+        """Count critical successes (pairs of 10s = +2 successes each pair)"""
         tens = sum(1 for die in self.all_dice if die == 10)
-        return tens // 2
+        pairs = tens // 2
+        return pairs * 2  # Each pair of 10s adds 2 additional successes
 
     def _check_messy_critical(self) -> bool:
         """Check if any desperation dice contributed to criticals"""
