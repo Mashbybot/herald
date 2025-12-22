@@ -11,7 +11,7 @@ import sys
 import platform
 from datetime import datetime
 
-from config.settings import ENVIRONMENT, USE_POSTGRESQL, MAINTENANCE_MODE
+from config.settings import ENVIRONMENT, MAINTENANCE_MODE
 
 logger = logging.getLogger('Herald.System')
 
@@ -39,10 +39,7 @@ class System(commands.Cog):
         try:
             from core.db import get_async_db
             async with get_async_db() as conn:
-                if USE_POSTGRESQL:
-                    await conn.fetchval("SELECT 1")
-                else:
-                    await conn.execute("SELECT 1")
+                await conn.fetchval("SELECT 1")
         except Exception as e:
             db_status = f"❌ Error: {str(e)[:50]}"
             logger.error(f"Database health check failed: {e}")
@@ -66,7 +63,7 @@ class System(commands.Cog):
 
         embed.add_field(
             name="🗄️ Database",
-            value=f"**Type:** {'PostgreSQL' if USE_POSTGRESQL else 'SQLite'}\n"
+            value=f"**Type:** PostgreSQL\n"
                   f"**Status:** {db_status}",
             inline=True
         )

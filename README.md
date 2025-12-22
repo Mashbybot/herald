@@ -25,7 +25,7 @@ So we built it.
 **Key design principles:**
 - ✅ **H5E mechanical accuracy** - Edge, Desperation, and messy crits work correctly
 - ✅ **Zero setup required** - Add bot, create character, start rolling
-- ✅ **Privacy-focused** - Local SQLite database, no external data collection
+- ✅ **Privacy-focused** - PostgreSQL database, no external data collection
 - ✅ **Open source** - Community-driven development
 - ✅ **Free forever** - No premium tiers, no paywalls, no subscriptions
 

@@ -9,19 +9,15 @@ DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 if not DISCORD_TOKEN:
     raise ValueError("DISCORD_TOKEN environment variable is required")
 
-# Database configuration
-# For development: SQLite file
-# For production: PostgreSQL connection string
+# Database configuration - PostgreSQL only
 DATABASE_URL = os.getenv("DATABASE_URL")
-DATABASE_PATH = os.getenv("DATABASE_PATH", "herald.db")  # Fallback for local development
-
-# Use PostgreSQL if DATABASE_URL is provided, SQLite otherwise
-USE_POSTGRESQL = bool(DATABASE_URL)
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL is required. Herald uses PostgreSQL for all deployments.")
 
 # Development vs Production settings
 GUILD_ID = int(os.getenv("ADMIN_SERVER")) if os.getenv("ADMIN_SERVER") else None
 DEBUG_MODE = os.getenv("DEBUG", "false").lower() == "true"
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")  # development, production
+ENVIRONMENT = os.getenv("ENVIRONMENT", "production")  # development, production
 
 # Optional settings with defaults
 OWNER_ID = int(os.getenv("OWNER_ID")) if os.getenv("OWNER_ID") else None
@@ -41,34 +37,14 @@ BETA_FEATURES = os.getenv("BETA_FEATURES", "false").lower() == "true"
 # Validate critical settings
 def validate_config():
     """Validate configuration settings and raise errors for invalid configs"""
-    import os
-    from pathlib import Path
-
     # Check Discord token format (basic validation)
     if DISCORD_TOKEN and len(DISCORD_TOKEN) < 50:
         raise ValueError("DISCORD_TOKEN appears to be invalid (too short)")
 
     # Production-specific validations
     if ENVIRONMENT == "production":
-        if not DATABASE_URL:
-            raise ValueError("DATABASE_URL is required for production environment")
         if GUILD_ID:
             raise ValueError("GUILD_ID should not be set in production (use global slash commands)")
-
-    # Development-specific validations
-    elif ENVIRONMENT == "development":
-        if not USE_POSTGRESQL and not DATABASE_PATH:
-            raise ValueError("DATABASE_PATH is required for SQLite in development mode")
-
-        # Ensure database directory exists for SQLite
-        if not USE_POSTGRESQL:
-            db_path = Path(DATABASE_PATH)
-            db_dir = db_path.parent
-            if not db_dir.exists():
-                try:
-                    db_dir.mkdir(parents=True, exist_ok=True)
-                except Exception as e:
-                    raise ValueError(f"Cannot create database directory {db_dir}: {e}")
 
     # Validate numeric settings
     if OWNER_ID is not None and OWNER_ID <= 0:
@@ -92,5 +68,5 @@ except ValueError as e:
     raise
 
 print(f"🔧 Herald configured for {ENVIRONMENT} environment")
-print(f"🗄️ Database: {'PostgreSQL' if USE_POSTGRESQL else 'SQLite'}")
+print(f"🗄️ Database: PostgreSQL")
 print(f"⚙️ Command scope: {'Guild-specific' if GUILD_ID else 'Global'}")

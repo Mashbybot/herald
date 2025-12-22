@@ -3,9 +3,7 @@ discord.py==2.4.0
 python-dotenv==1.0.1
 
 # Database dependencies
-# SQLite async support
-aiosqlite==0.20.0
-# PostgreSQL for production
+# PostgreSQL async support
 asyncpg==0.29.0
 
 # HTTP client (used by discord.py)
