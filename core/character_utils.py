@@ -655,40 +655,35 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         # Add visual separator after skills
         embed.add_field(name="\u200b", value="\u200b", inline=False)
 
-        # === EDGE AND PERKS (Hunter Abilities) ===
-        # Group perks by edge for display
-        perks_by_edge = {}
-        for perk in perks:
-            edge_name = perk.get('edge_name', 'Unknown')
-            if edge_name not in perks_by_edge:
-                perks_by_edge[edge_name] = []
-            perks_by_edge[edge_name].append(perk)
-
+        # === EDGES (Hunter Abilities) ===
         if edges:
+            edge_lines = []
             for edge in edges:
                 edge_name = edge.get('edge_name', 'Unknown')
-                edge_desc = edge.get('description', '')
+                edge_desc = edge.get('description', 'No description available')
+                # Format: ⚡**Edge Name** - *Description*
+                edge_lines.append(f"⚡ **{edge_name}** - *{edge_desc}*")
 
-                # Start with edge description
-                edge_display = []
-                if edge_desc:
-                    edge_display.append(f"*{edge_desc}*")
+            embed.add_field(
+                name="__Edges:__",
+                value="\n".join(edge_lines),
+                inline=False
+            )
 
-                # Add associated perks under this edge
-                if edge_name in perks_by_edge:
-                    edge_display.append("")  # Blank line
-                    edge_display.append("**Perks:**")
-                    for perk in perks_by_edge[edge_name]:
-                        perk_name = perk.get('perk_name', 'Unknown')
-                        edge_display.append(f"• {perk_name}")
+        # === PERKS (Edge Abilities) ===
+        if perks:
+            perk_lines = []
+            for perk in perks:
+                perk_name = perk.get('perk_name', 'Unknown')
+                perk_desc = perk.get('description', 'No description available')
+                # Format: ⚡**Perk Name** - *Description*
+                perk_lines.append(f"⚡ **{perk_name}** - *{perk_desc}*")
 
-                # Only display if there's content
-                if edge_display or not edge_desc:
-                    embed.add_field(
-                        name=f"__⚡ {edge_name}__",
-                        value="\n".join(edge_display) if edge_display else "*No description*",
-                        inline=False
-                    )
+            embed.add_field(
+                name="__Perks:__",
+                value="\n".join(perk_lines),
+                inline=False
+            )
 
         # Footer with helpful tips
         embed.set_footer(text="💡 Use /damage and /heal to manage health • Use /creed and /drive to set your Hunter's path")
