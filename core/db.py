@@ -88,6 +88,12 @@ async def run_postgresql_migrations():
             );
         """)
 
+        # Add in_despair column if it doesn't exist (migration for existing databases)
+        await conn.execute("""
+            ALTER TABLE characters
+            ADD COLUMN IF NOT EXISTS in_despair BOOLEAN DEFAULT FALSE;
+        """)
+
         # Skills table
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS skills (
