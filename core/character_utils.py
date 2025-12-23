@@ -585,7 +585,7 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         physical_attrs = [
             f"**Strength:**\u2002{create_skill_display(strength)}",  # +1 en
             f"**Dexterity:** {create_skill_display(dexterity)}",      # +0 (longest)
-            f"**Stamina:**\u2002{create_skill_display(stamina)}"  # +1 en
+            f"**Stamina:**\u2003{create_skill_display(stamina)}"  # +1 em
         ]
 
         charisma = max(1, min(5, character.get('charisma', 1)))
@@ -594,9 +594,9 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
 
         # Em space for alignment within column (longest in Social: "Manipulation" = 12 chars)
         social_attrs = [
-            f"**Charisma:**\u2003\u2003\u2002{create_skill_display(charisma)}",  # +2 em +1 en
+            f"**Charisma:**{create_skill_display(charisma)}",  # +0
             f"**Manipulation:**\u2002{create_skill_display(manipulation)}",                 # +1 en
-            f"**Composure:**\u2003\u2002{create_skill_display(composure)}"       # +1 em +1 en
+            f"**Composure:**{create_skill_display(composure)}"       # +0
         ]
 
         intelligence = max(1, min(5, character.get('intelligence', 1)))
