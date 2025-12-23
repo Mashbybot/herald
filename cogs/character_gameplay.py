@@ -1114,6 +1114,14 @@ class CharacterGameplay(commands.Cog):
         try:
             user_id = str(interaction.user.id)
 
+            # Get action from command parameters
+            namespace = interaction.namespace
+            action = getattr(namespace, 'action', None) if hasattr(interaction, 'namespace') else None
+
+            # Don't show autocomplete for "view" action - user just wants to see what they have
+            if action == "view":
+                return []
+
             # Get active character
             from core.character_utils import get_active_character, find_character, get_character_edges
             active_char_name = await get_active_character(user_id)
@@ -1159,6 +1167,14 @@ class CharacterGameplay(commands.Cog):
         try:
             user_id = str(interaction.user.id)
 
+            # Get action from command parameters to determine behavior
+            namespace = interaction.namespace
+            action = getattr(namespace, 'action', None) if hasattr(interaction, 'namespace') else None
+
+            # Don't show autocomplete for "view" action - user just wants to see what they have
+            if action == "view":
+                return []
+
             # Get active character
             from core.character_utils import get_active_character, find_character, get_character_edges, get_character_perks
             active_char_name = await get_active_character(user_id)
@@ -1169,9 +1185,6 @@ class CharacterGameplay(commands.Cog):
             if not char:
                 return []
 
-            # Get action from command parameters to determine behavior
-            namespace = interaction.namespace
-            action = getattr(namespace, 'action', None) if hasattr(interaction, 'namespace') else None
             selected_edge = getattr(namespace, 'edge_name', None) if hasattr(interaction, 'namespace') else None
 
             # Get character's current perks
