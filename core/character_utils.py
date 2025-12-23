@@ -482,6 +482,13 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
             color=0x8B0000  # Dark red theme for Hunter
         )
 
+        # Set thumbnail for despair state
+        in_despair = character.get('in_despair', False)
+        if in_despair:
+            # Use overreach/despair thumbnail when in despair
+            despair_thumbnail = "https://media.discordapp.net/attachments/1416859395962310716/1452436427685101750/Dice_Overreach.png?ex=6949ce55&is=69487cd5&hm=1c2991f783cf45a84fbcabf14b554d45c231e9f8c236fe268e09b726d38c876f&=&format=webp&quality=lossless"
+            embed.set_thumbnail(url=despair_thumbnail)
+
         # === CREED/DRIVE/DESIRE/AMBITION (Vertical list) ===
         # Format values in code blocks when data is present (like Inconnu)
         # Use block quotes for undefined fields (> must be at start for Discord markdown)
@@ -528,7 +535,6 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
         # Desperation
         desperation = max(0, min(10, character.get('desperation', 0)))
         desperation_bar = create_desperation_bar(desperation)
-        in_despair = character.get('in_despair', False)
 
         # Danger
         danger = max(0, min(10, character.get('danger', 0)))
