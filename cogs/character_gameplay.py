@@ -1105,6 +1105,51 @@ class CharacterGameplay(commands.Cog):
                 ephemeral=True
             )
 
+    async def edge_autocomplete_for_perks(
+        self,
+        interaction: discord.Interaction,
+        current: str
+    ) -> List[app_commands.Choice[str]]:
+        """Dynamic autocomplete for edge names - shows only character's owned edges"""
+        try:
+            user_id = str(interaction.user.id)
+
+            # Get active character
+            from core.character_utils import get_active_character, find_character, get_character_edges
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                return []
+
+            char = await find_character(user_id, active_char_name)
+            if not char:
+                return []
+
+            # Get character's edges
+            edges = await get_character_edges(user_id, char['name'])
+            if not edges:
+                return []
+
+            # Filter by current input
+            if current:
+                filtered_edges = [
+                    edge for edge in edges
+                    if current.lower() in edge['edge_name'].lower()
+                ]
+            else:
+                filtered_edges = edges
+
+            # Return up to 25 choices (though most characters won't have that many edges)
+            choices = [
+                app_commands.Choice(name=edge['edge_name'], value=edge['edge_name'])
+                for edge in filtered_edges[:25]
+            ]
+
+            return choices
+
+        except Exception as e:
+            logger.error(f"Error in edge autocomplete for perks: {e}")
+            return []
+
     async def perk_autocomplete(
         self,
         interaction: discord.Interaction,
@@ -1195,31 +1240,9 @@ class CharacterGameplay(commands.Cog):
             app_commands.Choice(name="View All", value="view"),
             app_commands.Choice(name="Add", value="add"),
             app_commands.Choice(name="Remove", value="remove")
-        ],
-        edge_name=[
-            # Assets
-            app_commands.Choice(name="Arsenal", value="Arsenal"),
-            app_commands.Choice(name="Fleet", value="Fleet"),
-            app_commands.Choice(name="Ordnance", value="Ordnance"),
-            app_commands.Choice(name="Library", value="Library"),
-            app_commands.Choice(name="Experimental Medicine", value="Experimental Medicine"),
-            # Aptitudes
-            app_commands.Choice(name="Improvised Gear", value="Improvised Gear"),
-            app_commands.Choice(name="Global Access", value="Global Access"),
-            app_commands.Choice(name="Drone Jockey", value="Drone Jockey"),
-            app_commands.Choice(name="Beast Whisperer", value="Beast Whisperer"),
-            app_commands.Choice(name="Turncoat", value="Turncoat"),
-            # Endowments
-            app_commands.Choice(name="Sense the Unnatural", value="Sense the Unnatural"),
-            app_commands.Choice(name="Repel the Unnatural", value="Repel the Unnatural"),
-            app_commands.Choice(name="Thwart the Unnatural", value="Thwart the Unnatural"),
-            app_commands.Choice(name="Artifact", value="Artifact"),
-            app_commands.Choice(name="Cleanse the Unnatural", value="Cleanse the Unnatural"),
-            app_commands.Choice(name="Great Destiny", value="Great Destiny"),
-            app_commands.Choice(name="Unnatural Changes", value="Unnatural Changes")
         ]
     )
-    @app_commands.autocomplete(perk_name=perk_autocomplete)
+    @app_commands.autocomplete(edge_name=edge_autocomplete_for_perks, perk_name=perk_autocomplete)
     async def perks(self, interaction: discord.Interaction, action: str, edge_name: str = None, perk_name: str = None):
         """Manage character Perks (Hunter advantages from Edges)"""
 
