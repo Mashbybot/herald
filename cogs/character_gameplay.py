@@ -1105,6 +1105,85 @@ class CharacterGameplay(commands.Cog):
                 ephemeral=True
             )
 
+    async def perk_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str
+    ) -> List[app_commands.Choice[str]]:
+        """Dynamic autocomplete for perk names based on character's edges and action"""
+        try:
+            user_id = str(interaction.user.id)
+
+            # Get active character
+            from core.character_utils import get_active_character, find_character, get_character_edges, get_character_perks
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                return []
+
+            char = await find_character(user_id, active_char_name)
+            if not char:
+                return []
+
+            # Get action from command parameters to determine behavior
+            namespace = interaction.namespace
+            action = getattr(namespace, 'action', None) if hasattr(interaction, 'namespace') else None
+            selected_edge = getattr(namespace, 'edge_name', None) if hasattr(interaction, 'namespace') else None
+
+            # Get character's current perks
+            current_perks = await get_character_perks(user_id, char['name'])
+
+            # If action is "remove", show only character's current perks
+            if action == "remove":
+                all_perks = [(p['perk_name'], p['edge_name']) for p in current_perks]
+            else:
+                # For "add" action, show available perks from character's edges
+                edges = await get_character_edges(user_id, char['name'])
+                if not edges:
+                    return []
+
+                current_perk_names = [p['perk_name'] for p in current_perks]
+
+                # Get all available perks for character's edges
+                from data.perks import get_perks_for_edge
+                all_perks = []
+
+                # If edge_name is specified, only show perks from that edge
+                if selected_edge:
+                    edge_perks = get_perks_for_edge(selected_edge)
+                    for perk_name in edge_perks.keys():
+                        if perk_name not in current_perk_names:
+                            all_perks.append((perk_name, selected_edge))
+                else:
+                    # Otherwise, show perks from all character's edges
+                    for edge in edges:
+                        edge_name = edge['edge_name']
+                        edge_perks = get_perks_for_edge(edge_name)
+                        for perk_name in edge_perks.keys():
+                            if perk_name not in current_perk_names:
+                                all_perks.append((perk_name, edge_name))
+
+            # Filter by current input
+            if current:
+                filtered = [
+                    (perk, edge) for perk, edge in all_perks
+                    if current.lower() in perk.lower()
+                ]
+            else:
+                filtered = all_perks
+
+            # Return up to 25 choices (Discord limit)
+            choices = []
+            for perk_name, edge_name in filtered[:25]:
+                # Show edge name in parentheses for context
+                display_name = f"{perk_name} ({edge_name})"
+                choices.append(app_commands.Choice(name=display_name, value=perk_name))
+
+            return choices
+
+        except Exception as e:
+            logger.error(f"Error in perk autocomplete: {e}")
+            return []
+
     @app_commands.command(name="perks", description="Manage your character's Edge Perks")
     @app_commands.describe(
         action="What to do with perks",
@@ -1140,6 +1219,7 @@ class CharacterGameplay(commands.Cog):
             app_commands.Choice(name="Unnatural Changes", value="Unnatural Changes")
         ]
     )
+    @app_commands.autocomplete(perk_name=perk_autocomplete)
     async def perks(self, interaction: discord.Interaction, action: str, edge_name: str = None, perk_name: str = None):
         """Manage character Perks (Hunter advantages from Edges)"""
 
