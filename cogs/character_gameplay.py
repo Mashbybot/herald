@@ -889,13 +889,37 @@ class CharacterGameplay(commands.Cog):
     @app_commands.command(name="edge", description="Manage your character's Hunter Edges")
     @app_commands.describe(
         action="What to do with edges",
-        edge_name="Edge name (for remove action)"
+        edge_name="Edge name (for add/remove actions)"
     )
-    @app_commands.choices(action=[
-        app_commands.Choice(name="View All", value="view"),
-        app_commands.Choice(name="Add", value="add"),
-        app_commands.Choice(name="Remove", value="remove")
-    ])
+    @app_commands.choices(
+        action=[
+            app_commands.Choice(name="View All", value="view"),
+            app_commands.Choice(name="Add", value="add"),
+            app_commands.Choice(name="Remove", value="remove")
+        ],
+        edge_name=[
+            # Assets
+            app_commands.Choice(name="Arsenal", value="Arsenal"),
+            app_commands.Choice(name="Fleet", value="Fleet"),
+            app_commands.Choice(name="Ordnance", value="Ordnance"),
+            app_commands.Choice(name="Library", value="Library"),
+            app_commands.Choice(name="Experimental Medicine", value="Experimental Medicine"),
+            # Aptitudes
+            app_commands.Choice(name="Improvised Gear", value="Improvised Gear"),
+            app_commands.Choice(name="Global Access", value="Global Access"),
+            app_commands.Choice(name="Drone Jockey", value="Drone Jockey"),
+            app_commands.Choice(name="Beast Whisperer", value="Beast Whisperer"),
+            app_commands.Choice(name="Turncoat", value="Turncoat"),
+            # Endowments
+            app_commands.Choice(name="Sense the Unnatural", value="Sense the Unnatural"),
+            app_commands.Choice(name="Repel the Unnatural", value="Repel the Unnatural"),
+            app_commands.Choice(name="Thwart the Unnatural", value="Thwart the Unnatural"),
+            app_commands.Choice(name="Artifact", value="Artifact"),
+            app_commands.Choice(name="Cleanse the Unnatural", value="Cleanse the Unnatural"),
+            app_commands.Choice(name="Great Destiny", value="Great Destiny"),
+            app_commands.Choice(name="Unnatural Changes", value="Unnatural Changes")
+        ]
+    )
     async def edge(self, interaction: discord.Interaction, action: str, edge_name: str = None):
         """Manage character Edges (Hunter supernatural advantages)"""
 
@@ -979,31 +1003,64 @@ class CharacterGameplay(commands.Cog):
                 await interaction.response.send_message(embed=embed)
 
             elif action == "add":
-                # Show interactive button selection
+                # Add an edge
+                if not edge_name:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Please specify the edge name to add using the edge_name parameter",
+                        ephemeral=True
+                    )
+                    return
+
+                # Get edge description from EdgeSelectionView.EDGES
+                description = EdgeSelectionView.EDGES.get(edge_name, "")
+
+                if not description:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} **{edge_name}** is not a valid edge",
+                        ephemeral=True
+                    )
+                    return
+
+                async with get_async_db() as conn:
+                    # Check if edge already exists
+                    existing = await conn.fetchrow(
+                        "SELECT edge_name FROM edges WHERE user_id = $1 AND character_name = $2 AND edge_name = $3",
+                        user_id, char['name'], edge_name
+                    )
+
+                    if existing:
+                        await interaction.response.send_message(
+                            f"{HeraldEmojis.ERROR} **{char['name']}** already has the **{edge_name}** edge!",
+                            ephemeral=True
+                        )
+                        return
+
+                    # Add the edge
+                    await conn.execute(
+                        "INSERT INTO edges (user_id, character_name, edge_name, description) VALUES ($1, $2, $3, $4)",
+                        user_id, char['name'], edge_name, description
+                    )
+
+                # Invalidate cache to ensure /sheet shows updated value
+                from core.character_utils import invalidate_character_cache
+                invalidate_character_cache(user_id, char['name'])
+
                 embed = discord.Embed(
-                    title=f"{HeraldEmojis.EDGE} Select an Edge",
-                    description=f"Choose an Edge for **{char['name']}**\n\nEdges are supernatural advantages divided into Assets, Aptitudes, and Endowments.",
+                    title=f"{HeraldEmojis.EDGE} Edge Added",
+                    description=f"**{char['name']}** gained the **{edge_name}** edge",
                     color=0xFFA500  # Orange
                 )
 
                 embed.add_field(
-                    name="📦 Assets",
-                    value="Access to resources, tools, or contacts that ordinary citizens don't have",
-                    inline=False
-                )
-                embed.add_field(
-                    name="🧠 Aptitudes",
-                    value="Supernatural abilities that defy normal human limits",
-                    inline=False
-                )
-                embed.add_field(
-                    name="✨ Endowments",
-                    value="Supernatural objects or abilities beyond what is natural",
+                    name="Description",
+                    value=description,
                     inline=False
                 )
 
-                view = EdgeSelectionView(user_id, char['name'])
-                await interaction.response.send_message(embed=embed, view=view)
+                embed.set_footer(text="View all edges with /edge action:View • Add perks with /perks action:Add")
+
+                await interaction.response.send_message(embed=embed)
+                logger.info(f"Added edge '{edge_name}' to {char['name']} (user {user_id})")
 
             elif action == "remove":
                 # Remove edge
@@ -1054,11 +1111,35 @@ class CharacterGameplay(commands.Cog):
         edge_name="Edge to view perks for (for add action)",
         perk_name="Perk name (for add/remove actions)"
     )
-    @app_commands.choices(action=[
-        app_commands.Choice(name="View All", value="view"),
-        app_commands.Choice(name="Add", value="add"),
-        app_commands.Choice(name="Remove", value="remove")
-    ])
+    @app_commands.choices(
+        action=[
+            app_commands.Choice(name="View All", value="view"),
+            app_commands.Choice(name="Add", value="add"),
+            app_commands.Choice(name="Remove", value="remove")
+        ],
+        edge_name=[
+            # Assets
+            app_commands.Choice(name="Arsenal", value="Arsenal"),
+            app_commands.Choice(name="Fleet", value="Fleet"),
+            app_commands.Choice(name="Ordnance", value="Ordnance"),
+            app_commands.Choice(name="Library", value="Library"),
+            app_commands.Choice(name="Experimental Medicine", value="Experimental Medicine"),
+            # Aptitudes
+            app_commands.Choice(name="Improvised Gear", value="Improvised Gear"),
+            app_commands.Choice(name="Global Access", value="Global Access"),
+            app_commands.Choice(name="Drone Jockey", value="Drone Jockey"),
+            app_commands.Choice(name="Beast Whisperer", value="Beast Whisperer"),
+            app_commands.Choice(name="Turncoat", value="Turncoat"),
+            # Endowments
+            app_commands.Choice(name="Sense the Unnatural", value="Sense the Unnatural"),
+            app_commands.Choice(name="Repel the Unnatural", value="Repel the Unnatural"),
+            app_commands.Choice(name="Thwart the Unnatural", value="Thwart the Unnatural"),
+            app_commands.Choice(name="Artifact", value="Artifact"),
+            app_commands.Choice(name="Cleanse the Unnatural", value="Cleanse the Unnatural"),
+            app_commands.Choice(name="Great Destiny", value="Great Destiny"),
+            app_commands.Choice(name="Unnatural Changes", value="Unnatural Changes")
+        ]
+    )
     async def perks(self, interaction: discord.Interaction, action: str, edge_name: str = None, perk_name: str = None):
         """Manage character Perks (Hunter advantages from Edges)"""
 
