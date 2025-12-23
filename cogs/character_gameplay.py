@@ -944,62 +944,59 @@ class CharacterGameplay(commands.Cog):
                 return
 
             if action == "view":
-                # Show all current edges
-                from core.character_utils import get_character_edges
-                edges = await get_character_edges(user_id, char['name'])
-
+                # Show all available edges (reference list)
                 embed = discord.Embed(
-                    title=f"{HeraldEmojis.EDGE} {char['name']}'s Edges",
+                    title=f"⚡ All Hunter Edges",
+                    description="Browse all available Edges. Use `/sheet` to see your character's current Edges.",
                     color=0xFFA500  # Orange
                 )
 
-                if edges:
-                    # Group by category
-                    assets = []
-                    aptitudes = []
-                    endowments = []
+                # Assets
+                assets = [
+                    "• **Arsenal** - Access to weapons and military equipment",
+                    "• **Fleet** - Access to vehicles on short notice",
+                    "• **Ordnance** - Access to explosives and munitions",
+                    "• **Library** - Research supernatural creatures and phenomena",
+                    "• **Experimental Medicine** - Perform experimental procedures"
+                ]
 
-                    asset_names = ["Arsenal", "Fleet", "Ordnance", "Library", "Experimental Medicine"]
-                    aptitude_names = ["Improvised Gear", "Global Access", "Drone Jockey", "Beast Whisperer", "Turncoat"]
+                # Aptitudes
+                aptitudes = [
+                    "• **Improvised Gear** - Create tools and equipment from mundane items",
+                    "• **Global Access** - Manipulate digital systems and surveillance",
+                    "• **Drone Jockey** - Control drones for surveillance and combat",
+                    "• **Beast Whisperer** - Command and communicate with animals",
+                    "• **Turncoat** - Infiltrate and deceive supernatural enemies"
+                ]
 
-                    for edge in edges:
-                        edge_name = edge.get('edge_name', 'Unknown')
-                        edge_desc = edge.get('description', '')
+                # Endowments
+                endowments = [
+                    "• **Sense the Unnatural** - Detect supernatural presence",
+                    "• **Repel the Unnatural** - Ward off supernatural creatures",
+                    "• **Thwart the Unnatural** - Resist supernatural powers",
+                    "• **Artifact** - Possess a rare supernatural object",
+                    "• **Cleanse the Unnatural** - Remove supernatural influence",
+                    "• **Great Destiny** - Empowered by a higher purpose",
+                    "• **Unnatural Changes** - Transform your body supernaturally"
+                ]
 
-                        if edge_name in asset_names:
-                            assets.append(f"• **{edge_name}**")
-                        elif edge_name in aptitude_names:
-                            aptitudes.append(f"• **{edge_name}**")
-                        else:
-                            endowments.append(f"• **{edge_name}**")
+                embed.add_field(
+                    name="📦 Assets",
+                    value='\n'.join(assets),
+                    inline=False
+                )
+                embed.add_field(
+                    name="🧠 Aptitudes",
+                    value='\n'.join(aptitudes),
+                    inline=False
+                )
+                embed.add_field(
+                    name="✨ Endowments",
+                    value='\n'.join(endowments),
+                    inline=False
+                )
 
-                    if assets:
-                        embed.add_field(
-                            name="📦 Assets",
-                            value='\n'.join(assets),
-                            inline=False
-                        )
-                    if aptitudes:
-                        embed.add_field(
-                            name="🧠 Aptitudes",
-                            value='\n'.join(aptitudes),
-                            inline=False
-                        )
-                    if endowments:
-                        embed.add_field(
-                            name="✨ Endowments",
-                            value='\n'.join(endowments),
-                            inline=False
-                        )
-                else:
-                    embed.description = "*No Edges yet*"
-                    embed.add_field(
-                        name="What are Edges?",
-                        value="Edges are supernatural advantages that put Hunters above ordinary people. Use `/edge action:Add` to gain an Edge!",
-                        inline=False
-                    )
-
-                embed.set_footer(text="Use /edge action:Add to gain new edges • /edge action:Remove to remove an edge")
+                embed.set_footer(text="Use /edge action:Add edge_name:\"Edge Name\" to gain an edge • /sheet to see your edges")
                 await interaction.response.send_message(embed=embed)
 
             elif action == "add":
@@ -1105,6 +1102,59 @@ class CharacterGameplay(commands.Cog):
                 ephemeral=True
             )
 
+    async def edge_autocomplete_for_perks(
+        self,
+        interaction: discord.Interaction,
+        current: str
+    ) -> List[app_commands.Choice[str]]:
+        """Dynamic autocomplete for edge names - shows only character's owned edges"""
+        try:
+            user_id = str(interaction.user.id)
+
+            # Get action from command parameters
+            namespace = interaction.namespace
+            action = getattr(namespace, 'action', None) if hasattr(interaction, 'namespace') else None
+
+            # Don't show autocomplete for "view" action - user just wants to see what they have
+            if action == "view":
+                return []
+
+            # Get active character
+            from core.character_utils import get_active_character, find_character, get_character_edges
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                return []
+
+            char = await find_character(user_id, active_char_name)
+            if not char:
+                return []
+
+            # Get character's edges
+            edges = await get_character_edges(user_id, char['name'])
+            if not edges:
+                return []
+
+            # Filter by current input
+            if current:
+                filtered_edges = [
+                    edge for edge in edges
+                    if current.lower() in edge['edge_name'].lower()
+                ]
+            else:
+                filtered_edges = edges
+
+            # Return up to 25 choices (though most characters won't have that many edges)
+            choices = [
+                app_commands.Choice(name=edge['edge_name'], value=edge['edge_name'])
+                for edge in filtered_edges[:25]
+            ]
+
+            return choices
+
+        except Exception as e:
+            logger.error(f"Error in edge autocomplete for perks: {e}")
+            return []
+
     async def perk_autocomplete(
         self,
         interaction: discord.Interaction,
@@ -1113,6 +1163,14 @@ class CharacterGameplay(commands.Cog):
         """Dynamic autocomplete for perk names based on character's edges and action"""
         try:
             user_id = str(interaction.user.id)
+
+            # Get action from command parameters to determine behavior
+            namespace = interaction.namespace
+            action = getattr(namespace, 'action', None) if hasattr(interaction, 'namespace') else None
+
+            # Don't show autocomplete for "view" action - user just wants to see what they have
+            if action == "view":
+                return []
 
             # Get active character
             from core.character_utils import get_active_character, find_character, get_character_edges, get_character_perks
@@ -1124,9 +1182,6 @@ class CharacterGameplay(commands.Cog):
             if not char:
                 return []
 
-            # Get action from command parameters to determine behavior
-            namespace = interaction.namespace
-            action = getattr(namespace, 'action', None) if hasattr(interaction, 'namespace') else None
             selected_edge = getattr(namespace, 'edge_name', None) if hasattr(interaction, 'namespace') else None
 
             # Get character's current perks
@@ -1195,31 +1250,9 @@ class CharacterGameplay(commands.Cog):
             app_commands.Choice(name="View All", value="view"),
             app_commands.Choice(name="Add", value="add"),
             app_commands.Choice(name="Remove", value="remove")
-        ],
-        edge_name=[
-            # Assets
-            app_commands.Choice(name="Arsenal", value="Arsenal"),
-            app_commands.Choice(name="Fleet", value="Fleet"),
-            app_commands.Choice(name="Ordnance", value="Ordnance"),
-            app_commands.Choice(name="Library", value="Library"),
-            app_commands.Choice(name="Experimental Medicine", value="Experimental Medicine"),
-            # Aptitudes
-            app_commands.Choice(name="Improvised Gear", value="Improvised Gear"),
-            app_commands.Choice(name="Global Access", value="Global Access"),
-            app_commands.Choice(name="Drone Jockey", value="Drone Jockey"),
-            app_commands.Choice(name="Beast Whisperer", value="Beast Whisperer"),
-            app_commands.Choice(name="Turncoat", value="Turncoat"),
-            # Endowments
-            app_commands.Choice(name="Sense the Unnatural", value="Sense the Unnatural"),
-            app_commands.Choice(name="Repel the Unnatural", value="Repel the Unnatural"),
-            app_commands.Choice(name="Thwart the Unnatural", value="Thwart the Unnatural"),
-            app_commands.Choice(name="Artifact", value="Artifact"),
-            app_commands.Choice(name="Cleanse the Unnatural", value="Cleanse the Unnatural"),
-            app_commands.Choice(name="Great Destiny", value="Great Destiny"),
-            app_commands.Choice(name="Unnatural Changes", value="Unnatural Changes")
         ]
     )
-    @app_commands.autocomplete(perk_name=perk_autocomplete)
+    @app_commands.autocomplete(edge_name=edge_autocomplete_for_perks, perk_name=perk_autocomplete)
     async def perks(self, interaction: discord.Interaction, action: str, edge_name: str = None, perk_name: str = None):
         """Manage character Perks (Hunter advantages from Edges)"""
 
@@ -1255,50 +1288,43 @@ class CharacterGameplay(commands.Cog):
                 return
 
             if action == "view":
-                # Show all current perks grouped by edge
-                perks = await get_character_perks(user_id, char['name'])
+                # Show all available perks (reference list) organized by edge
+                from data.perks import EDGE_PERKS
 
                 embed = discord.Embed(
-                    title=f"🎭 {char['name']}'s Perks",
+                    title=f"🎭 All Edge Perks",
+                    description="Browse all available Perks by Edge. Use `/sheet` to see your character's current Perks.",
                     color=0xFFA500  # Orange
                 )
 
-                if perks:
-                    # Group perks by edge
-                    from collections import defaultdict
-                    perks_by_edge = defaultdict(list)
+                # Display perks grouped by edge (showing first 10 edges due to Discord embed limits)
+                edges_shown = 0
+                for edge_name, perks_dict in sorted(EDGE_PERKS.items()):
+                    if edges_shown >= 10:  # Discord has 25 field limit, but we want to keep it readable
+                        break
 
-                    for perk in perks:
-                        edge = perk.get('edge_name', 'Unknown')
-                        perk_nm = perk.get('perk_name', 'Unknown')
-                        perks_by_edge[edge].append(perk_nm)
+                    perk_names = list(perks_dict.keys())
+                    perk_display = '\n'.join([f"• {p}" for p in perk_names[:15]])  # Limit per edge to avoid field length limits
 
-                    # Display perks grouped by edge
-                    for edge, perk_list in sorted(perks_by_edge.items()):
-                        perk_display = '\n'.join([f"• {p}" for p in perk_list])
-                        embed.add_field(
-                            name=f"⚡ {edge}",
-                            value=perk_display,
-                            inline=False
-                        )
-                else:
-                    embed.description = "*No Perks yet*"
+                    if len(perk_names) > 15:
+                        perk_display += f"\n*...and {len(perk_names) - 15} more*"
 
-                    if edges:
-                        edge_list = ", ".join([e['edge_name'] for e in edges])
-                        embed.add_field(
-                            name="Your Edges",
-                            value=f"You have the following Edges: **{edge_list}**\n\nUse `/perks action:Add` to gain Perks for your Edges!",
-                            inline=False
-                        )
-                    else:
-                        embed.add_field(
-                            name="What are Perks?",
-                            value="Perks are special abilities tied to your Edges. First gain an Edge with `/edge action:Add`, then gain Perks for that Edge!",
-                            inline=False
-                        )
+                    embed.add_field(
+                        name=f"⚡ {edge_name}",
+                        value=perk_display,
+                        inline=False
+                    )
+                    edges_shown += 1
 
-                embed.set_footer(text="Use /perks action:Add to gain new perks • /perks action:Remove to remove a perk")
+                if len(EDGE_PERKS) > 10:
+                    remaining_edges = sorted(list(EDGE_PERKS.keys())[10:])
+                    embed.add_field(
+                        name="📋 Additional Edges",
+                        value="**" + "**, **".join(remaining_edges) + "**",
+                        inline=False
+                    )
+
+                embed.set_footer(text="Use /perks action:Add edge_name:\"Edge Name\" to browse perks for a specific edge • /sheet to see your perks")
                 await interaction.response.send_message(embed=embed)
 
             elif action == "add":
