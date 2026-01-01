@@ -80,18 +80,18 @@ Herald is maintained by active H5E players who use it in their own campaigns. We
 ## Screenshots
 
 ### Character Sheet
-![Character Sheet](docs/images/sheet.png)
+![Character Sheet](docs/images/sheet.webp)
 *Complete character tracking with Creed, Drive, Desire, Ambition, and all H5E stats*
 
 ### Dice Rolling
-![Successful Roll](docs/images/success.png)
+![Successful Roll](docs/images/success.webp)
 *Edge system in action with automatic success calculation*
 
-![Desperation Roll](docs/images/despair.png)
+![Desperation Roll](docs/images/despair.webp)
 *Automatic Despair triggers with narrative consequences*
 
 ### Help System
-![Help Command](docs/images/help.png)
+![Help Command](docs/images/help.webp)
 *Intuitive command structure with comprehensive help*
 
 ---
