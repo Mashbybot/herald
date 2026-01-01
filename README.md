@@ -14,6 +14,18 @@ Get started in under 5 minutes. No setup required. Just add Herald and start hun
 
 ---
 
+## About Herald
+
+> **🔸 Herald Protocol**
+>
+> *"Query recognized. Assistance requested."*
+>
+> Herald is your assistant for Hunter: The Reckoning 5th Edition gameplay. Operations available: character management, H5E dice mechanics, progression tracking, and hunt coordination.
+>
+> **What are we Hunting?**
+
+---
+
 ## Why Herald?
 
 **Pattern observed:** When official tools are absent, Hunters build their own.
@@ -65,6 +77,25 @@ Herald is maintained by active H5E players who use it in their own campaigns. We
 
 ---
 
+## Screenshots
+
+### Character Sheet
+![Character Sheet](docs/images/sheet.png)
+*Complete character tracking with Creed, Drive, Desire, Ambition, and all H5E stats*
+
+### Dice Rolling
+![Successful Roll](docs/images/success.png)
+*Edge system in action with automatic success calculation*
+
+![Desperation Roll](docs/images/despair.png)
+*Automatic Despair triggers with narrative consequences*
+
+### Help System
+![Help Command](docs/images/help.png)
+*Intuitive command structure with comprehensive help*
+
+---
+
 ## Quick Start
 
 **1. Invite Herald** (link above)
@@ -88,19 +119,74 @@ Herald is maintained by active H5E players who use it in their own campaigns. We
 
 ---
 
+## Development Setup
+
+Want to tinker with Herald's code? Here's the bare minimum to get started.
+
+**Requirements:**
+- Python 3.11+
+- PostgreSQL database
+- Discord bot token
+
+**Setup:**
+```bash
+# Clone repository
+git clone https://github.com/Mashbybot/herald.git
+cd herald
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment (copy .env.example to .env and fill in values)
+cp .env.example .env
+
+# Run bot
+python bot.py
+```
+
+**Note:** Self-hosting support is minimal. The hosted version is actively maintained and recommended for gameplay.
+
+---
+
 ## Tech Stack
 
 - **Language:** Python 3.11+
 - **Framework:** discord.py 2.x (slash commands)
-- **Database:** Postgre
+- **Database:** PostgreSQL
 - **Architecture:** Modular cogs system
-- **Deployment:** Self-hosted or cloud
+- **Deployment:** Railway (hosted version)
 
 ---
 
-🤝 Community & Support
+## Contributing
 
-[Support Discord Server](https://discord.gg/9bEZk6ARG9) - Get help, report bugs, suggest features
+Herald is community-driven and welcomes contributions from H5E players and developers.
 
+**Special Thanks:**
+- **[Tiltowait](https://github.com/tiltowait)** - Creator of [Inconnu](https://github.com/tiltowait/inconnu) (Vampire: The Masquerade bot), whose excellent work inspired Herald's architecture and provided valuable code feedback
 
-## 🔸 What are we Hunting?
+**How to Contribute:**
+- Report bugs and suggest features on [GitHub Issues](https://github.com/Mashbybot/herald/issues)
+- Join the [Support Discord](https://discord.gg/9bEZk6ARG9) to discuss development
+- Submit pull requests (please discuss major changes first)
+
+**Development Credits:**
+- Developed with assistance from Claude (Anthropic)
+
+---
+
+## License
+
+Herald is open source software released under the [MIT License](LICENSE).
+
+Free to use, modify, and distribute. Built for the Hunter community.
+
+---
+
+## 🤝 Community & Support
+
+**[Support Discord Server](https://discord.gg/9bEZk6ARG9)** - Get help, report bugs, suggest features
+
+---
+
+*🔸 Protocol active. Happy hunting.*
