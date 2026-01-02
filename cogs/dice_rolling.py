@@ -445,19 +445,8 @@ class DiceRolling(commands.Cog):
     @app_commands.describe(
         pool="Total dice pool to roll",
         desperate="Use Desperation dice (adds dots from your Desperation track)",
-        difficulty="Target number of successes needed",
+        difficulty="Difficulty (0=Auto, 1=Simple, 2=Standard, 3=Hard, 4=Extreme, 5=Nearly Impossible, 6=Legendary, 7+=Epic)",
         comment="Description of what you're rolling for"
-    )
-    @app_commands.choices(
-        difficulty=[
-            app_commands.Choice(name="Difficulty 0 (Automatic)", value=0),
-            app_commands.Choice(name="Difficulty 1 (Simple)", value=1),
-            app_commands.Choice(name="Difficulty 2 (Standard)", value=2),
-            app_commands.Choice(name="Difficulty 3 (Hard)", value=3),
-            app_commands.Choice(name="Difficulty 4 (Extreme)", value=4),
-            app_commands.Choice(name="Difficulty 5 (Nearly Impossible)", value=5),
-            app_commands.Choice(name="Difficulty 6 (Legendary)", value=6)
-        ]
     )
     async def roll_dice(
         self,
@@ -474,6 +463,13 @@ class DiceRolling(commands.Cog):
         if pool < 1 or pool > 20:
             await interaction.response.send_message(
                 f"{HeraldEmojis.ERROR} Pool must be 1-20 dice",
+                ephemeral=True
+            )
+            return
+
+        if difficulty < 0 or difficulty > 20:
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Difficulty must be 0-20",
                 ephemeral=True
             )
             return
