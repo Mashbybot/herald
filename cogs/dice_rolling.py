@@ -59,8 +59,13 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
         success_text = "AUTOMATIC DESPAIR"
         color = 0x8B0000  # Dark red for despair
     else:
-        success_text = create_success_description(result.total_successes, result.crits, result.messy_critical)
-        color = get_result_color(result.total_successes, result.crits, result.messy_critical)
+        # Check if roll failed (negative margin means didn't meet difficulty)
+        if difficulty > 0 and margin < 0:
+            success_text = "FAILURE"
+            color = HeraldEmojis.COLOR_TOTAL_FAILURE
+        else:
+            success_text = create_success_description(result.total_successes, result.crits, result.messy_critical)
+            color = get_result_color(result.total_successes, result.crits, result.messy_critical)
     margin_text = format_margin_display(margin)
 
     # === STEP 2.5: Determine thumbnail based on result type ===
@@ -68,6 +73,9 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
     if is_automatic_despair:
         # Automatic despair uses overreach thumbnail
         thumbnail_url = THUMBNAIL_URLS.get("overreach")
+    elif difficulty > 0 and margin < 0:
+        # Failed to meet difficulty
+        thumbnail_url = THUMBNAIL_URLS.get("failure")
     elif result.has_overreach or result.messy_critical:
         # Overreach choice or messy critical
         thumbnail_url = THUMBNAIL_URLS.get("overreach")
@@ -93,6 +101,12 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
     
     # === STEP 4: Main result (large, prominent) ===
     embed.add_field(name="", value=f"**{success_text}**", inline=False)
+
+    # === STEP 4.5: Comment (if provided) ===
+    # Extract comment from pool_description if it contains a newline
+    if pool_description and "\n" in pool_description:
+        comment_text = pool_description.split("\n")[0]
+        embed.add_field(name="", value=f"*{comment_text}*", inline=False)
 
     # === STEP 5: Margin ===
     if difficulty > 0:
