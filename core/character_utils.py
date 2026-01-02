@@ -667,8 +667,8 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
             for edge in edges:
                 edge_name = edge.get('edge_name', 'Unknown')
                 edge_desc = edge.get('description', 'No description available')
-                # Format: ⚡**Edge Name** - *Description*
-                edge_lines.append(f"⚡ **{edge_name}** - *{edge_desc}*")
+                # Format: 🔸**Edge Name** - *Description*
+                edge_lines.append(f"🔸 **{edge_name}** - *{edge_desc}*")
 
             embed.add_field(
                 name="__Edges:__",
@@ -682,8 +682,8 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
             for perk in perks:
                 perk_name = perk.get('perk_name', 'Unknown')
                 perk_desc = perk.get('description', 'No description available')
-                # Format: ⚡**Perk Name** - *Description*
-                perk_lines.append(f"⚡ **{perk_name}** - *{perk_desc}*")
+                # Format: 🔸**Perk Name** - *Description*
+                perk_lines.append(f"🔸 **{perk_name}** - *{perk_desc}*")
 
             embed.add_field(
                 name="__Perks:__",

@@ -139,7 +139,7 @@ class WillpowerRerollView(discord.ui.View):
         self.used = True
         await interaction.response.edit_message(embed=new_embed, view=self)
 
-    @discord.ui.button(label="Re-Roll Failures", style=discord.ButtonStyle.primary, emoji="🔄")
+    @discord.ui.button(label="Re-Roll Failures", style=discord.ButtonStyle.primary)
     async def reroll_failures_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Re-roll up to 3 failed regular dice (2-5)"""
         if interaction.user.id != int(self.user_id):
@@ -168,7 +168,7 @@ class WillpowerRerollView(discord.ui.View):
 
         await self._update_result(interaction, new_dice)
 
-    @discord.ui.button(label="Max Crits", style=discord.ButtonStyle.primary, emoji="⭐")
+    @discord.ui.button(label="Max Crits", style=discord.ButtonStyle.primary)
     async def max_crits_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Re-roll up to 3 failing dice; if fewer than 3 failures, also re-roll successes"""
         if interaction.user.id != int(self.user_id):
@@ -202,7 +202,7 @@ class WillpowerRerollView(discord.ui.View):
 
         await self._update_result(interaction, new_dice)
 
-    @discord.ui.button(label="Avoid Messy", style=discord.ButtonStyle.danger, emoji="💀")
+    @discord.ui.button(label="Avoid Messy", style=discord.ButtonStyle.danger)
     async def avoid_messy_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Re-roll tens to attempt to avoid Messy Critical"""
         if interaction.user.id != int(self.user_id):
@@ -228,7 +228,7 @@ class WillpowerRerollView(discord.ui.View):
 
         await self._update_result(interaction, new_dice)
 
-    @discord.ui.button(label="Risky Avoid", style=discord.ButtonStyle.danger, emoji="⚠️")
+    @discord.ui.button(label="Risky Avoid", style=discord.ButtonStyle.danger)
     async def risky_avoid_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Re-roll tens; if <3 tens, also re-roll failures"""
         if interaction.user.id != int(self.user_id):

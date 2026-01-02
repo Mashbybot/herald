@@ -232,7 +232,7 @@ class EdgeButtonView(discord.ui.View):
                 label=edge_name,
                 style=discord.ButtonStyle.secondary,  # Orange/gray style
                 custom_id=f"edge_{i}",
-                emoji="⚡",
+                emoji="🔸",
                 row=i // 5  # 5 buttons per row
             )
             button.callback = self._create_edge_callback(edge)
@@ -246,7 +246,7 @@ class EdgeButtonView(discord.ui.View):
             edge_pool = self.EDGE_POOLS.get(edge_name, "See rulebook for dice pool")
 
             embed = discord.Embed(
-                title=f"⚡ {edge_name}",
+                title=f"🔸 {edge_name}",
                 description=edge_desc,
                 color=0xFFA500  # Orange
             )

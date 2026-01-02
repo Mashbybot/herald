@@ -946,7 +946,7 @@ class CharacterProgression(commands.Cog):
                 inline=False
             )
             embed.add_field(
-                name="⚡ Edges",
+                name="🔸 Edges",
                 value="**`/edge`** - Supernatural advantages divided into Assets, Aptitudes, and Endowments. "
                       "View your edges with `/edge action:View`, add new edges with `/edge action:Add`, or remove with `/edge action:Remove`. "
                       "Orange buttons on your `/sheet` show edge details and dice pools!",

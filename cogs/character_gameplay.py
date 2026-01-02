@@ -946,7 +946,7 @@ class CharacterGameplay(commands.Cog):
             if action == "view":
                 # Show all available edges (reference list)
                 embed = discord.Embed(
-                    title=f"⚡ All Hunter Edges",
+                    title=f"🔸 All Hunter Edges",
                     description="Browse all available Edges. Use `/sheet` to see your character's current Edges.",
                     color=0xFFA500  # Orange
                 )
@@ -1310,7 +1310,7 @@ class CharacterGameplay(commands.Cog):
                         perk_display += f"\n*...and {len(perk_names) - 15} more*"
 
                     embed.add_field(
-                        name=f"⚡ {edge_name}",
+                        name=f"🔸 {edge_name}",
                         value=perk_display,
                         inline=False
                     )
@@ -1339,7 +1339,7 @@ class CharacterGameplay(commands.Cog):
 
                     edge_list = []
                     for edge in edges:
-                        edge_list.append(f"⚡ **{edge['edge_name']}**")
+                        edge_list.append(f"🔸 **{edge['edge_name']}**")
 
                     embed.add_field(
                         name="\u200b",
@@ -1468,7 +1468,7 @@ class CharacterGameplay(commands.Cog):
                 )
 
                 embed.add_field(
-                    name=f"⚡ {edge_name}",
+                    name=f"🔸 {edge_name}",
                     value=f"**{perk_name}**\n*{perk_description}*",
                     inline=False
                 )

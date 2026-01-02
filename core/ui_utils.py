@@ -36,7 +36,7 @@ class HeraldEmojis:
     WILLPOWER_EMPTY = "▪️"       # Black Small Square (no capacity)
 
     # H5E Mechanics
-    EDGE = "⚡"
+    EDGE = "🔸"
     EDGE_EMPTY = "🔹"
     DESPERATION = "😰"           # Anxious Face with Sweat
 
