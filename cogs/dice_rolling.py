@@ -82,9 +82,10 @@ class WillpowerRerollView(discord.ui.View):
             )
             return False
 
-        willpower_max = char.get('willpower_max', 0)
-        willpower_superficial = char.get('willpower_superficial', 0)
-        willpower_aggravated = char.get('willpower_aggravated', 0)
+        # Correct database field names
+        willpower_max = char.get('willpower', 0)
+        willpower_superficial = char.get('willpower_sup', 0)
+        willpower_aggravated = char.get('willpower_agg', 0)
 
         # Calculate available willpower
         available = willpower_max - willpower_superficial - willpower_aggravated
@@ -103,7 +104,7 @@ class WillpowerRerollView(discord.ui.View):
         async with get_async_db() as conn:
             await conn.execute("""
                 UPDATE characters
-                SET willpower_superficial = willpower_superficial + 1
+                SET willpower_sup = willpower_sup + 1
                 WHERE user_id = $1 AND name = $2
             """, self.user_id, self.character_name)
 
