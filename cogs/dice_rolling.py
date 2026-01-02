@@ -117,25 +117,31 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
     if dice_display:
         embed.add_field(name="", value=dice_display, inline=False)
 
-    # === STEP 7: Pool | Desperation | Difficulty (bottom line) ===
-    bottom_parts = []
+    # === STEP 7: Pool | Desperation | Difficulty (Inconnu-style table) ===
+    headers = []
+    values = []
 
-    # Pool info
-    if pool_description:
-        pool_calc = pool_description.split(" = ")[0] if " = " in pool_description else pool_description
-        bottom_parts.append(f"**Dice:** {len(result.dice)}")
+    # Always show dice count
+    headers.append("Dice")
+    values.append(str(len(result.dice)))
 
     # Desperation dice count
     if result.desperation_dice:
-        bottom_parts.append(f"**Hunger:** {len(result.desperation_dice)}")
+        headers.append("Desperation")
+        values.append(str(len(result.desperation_dice)))
 
     # Difficulty
     if difficulty > 0:
         actual_diff = difficulty + danger if danger > 0 else difficulty
-        bottom_parts.append(f"**Difficulty:** {actual_diff}")
+        headers.append("Difficulty")
+        values.append(str(actual_diff))
 
-    if bottom_parts:
-        embed.add_field(name="", value=" | ".join(bottom_parts), inline=False)
+    if headers:
+        # Create table-like layout with proper spacing
+        header_line = "    ".join(f"{h:<12}" for h in headers).rstrip()
+        value_line = "    ".join(f"{v:<12}" for v in values).rstrip()
+        table_text = f"```\n{header_line}\n{value_line}\n```"
+        embed.add_field(name="", value=table_text, inline=False)
 
     # === STEP 9: Critical warnings with Herald's voice ===
     if result.messy_critical:
