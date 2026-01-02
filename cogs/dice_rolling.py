@@ -8,6 +8,7 @@ from discord import app_commands
 from discord.ext import commands
 from typing import List, Optional
 import logging
+import random
 
 from core.dice import roll_pool, simple_roll, roll_rouse_check, DiceResult
 from core.dice_utils import (
@@ -35,9 +36,231 @@ THUMBNAIL_URLS = {
 # H5E Attributes for choices
 H5E_ATTRIBUTES = [
     "Strength", "Dexterity", "Stamina",
-    "Charisma", "Manipulation", "Composure", 
+    "Charisma", "Manipulation", "Composure",
     "Intelligence", "Wits", "Resolve"
 ]
+
+
+class WillpowerRerollView(discord.ui.View):
+    """View for Willpower re-roll buttons (Inconnu-style)"""
+
+    def __init__(self, user_id: str, result: DiceResult, character_name: str = None,
+                 difficulty: int = 0, danger: int = 0, pool_description: str = None):
+        super().__init__(timeout=300)  # 5 minute timeout
+        self.user_id = user_id
+        self.result = result
+        self.character_name = character_name
+        self.difficulty = difficulty
+        self.danger = danger
+        self.pool_description = pool_description
+        self.used = False
+
+        # Conditionally show buttons based on roll state
+        # Avoid Messy only shows if there's a messy critical
+        if not result.messy_critical:
+            self.remove_item(self.avoid_messy_button)
+
+        # Risky Avoid only shows if there are tens
+        tens_count = sum(1 for d in result.dice if d == 10)
+        if tens_count == 0:
+            self.remove_item(self.risky_avoid_button)
+
+    async def _check_willpower(self, interaction: discord.Interaction) -> bool:
+        """Check if character has available willpower"""
+        if not self.character_name:
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} No active character for willpower re-roll!",
+                ephemeral=True
+            )
+            return False
+
+        char = await find_character(self.user_id, self.character_name)
+        if not char:
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Character not found!",
+                ephemeral=True
+            )
+            return False
+
+        willpower_max = char.get('willpower_max', 0)
+        willpower_superficial = char.get('willpower_superficial', 0)
+        willpower_aggravated = char.get('willpower_aggravated', 0)
+
+        # Calculate available willpower
+        available = willpower_max - willpower_superficial - willpower_aggravated
+
+        if available < 1:
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Not enough Willpower! Need 1 undamaged Willpower to re-roll.",
+                ephemeral=True
+            )
+            return False
+
+        return True
+
+    async def _spend_willpower(self):
+        """Spend 1 willpower (add superficial damage)"""
+        async with get_async_db() as conn:
+            await conn.execute("""
+                UPDATE characters
+                SET willpower_superficial = willpower_superficial + 1
+                WHERE user_id = $1 AND name = $2
+            """, self.user_id, self.character_name)
+
+        # Invalidate cache
+        from core.character_utils import invalidate_character_cache
+        invalidate_character_cache(self.user_id, self.character_name)
+
+    async def _update_result(self, interaction: discord.Interaction, new_dice: List[int]):
+        """Update the roll with new dice values and refresh display"""
+        # Create new DiceResult with re-rolled dice
+        new_result = DiceResult(new_dice, self.result.desperation_dice)
+
+        # Spend willpower
+        await self._spend_willpower()
+
+        # Generate new embed
+        new_embed = format_dice_result(
+            new_result,
+            self.pool_description,
+            self.character_name,
+            self.difficulty,
+            self.danger
+        )
+
+        # Add re-roll indicator
+        new_embed.set_footer(text="⚡ Willpower Re-roll Used (-1 Superficial Willpower)")
+
+        # Disable all buttons
+        for item in self.children:
+            item.disabled = True
+
+        self.used = True
+        await interaction.response.edit_message(embed=new_embed, view=self)
+
+    @discord.ui.button(label="Re-Roll Failures", style=discord.ButtonStyle.primary, emoji="🔄")
+    async def reroll_failures_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Re-roll up to 3 failed regular dice (2-5)"""
+        if interaction.user.id != int(self.user_id):
+            await interaction.response.send_message("This isn't your roll!", ephemeral=True)
+            return
+
+        if not await self._check_willpower(interaction):
+            return
+
+        # Find failures (2-5) in regular dice only
+        failures = [i for i, d in enumerate(self.result.dice) if 2 <= d <= 5]
+
+        if not failures:
+            await interaction.response.send_message(
+                f"{HeraldEmojis.WARNING} No failures to re-roll!",
+                ephemeral=True
+            )
+            return
+
+        # Re-roll up to 3 failures
+        to_reroll = failures[:3]
+        new_dice = self.result.dice.copy()
+
+        for idx in to_reroll:
+            new_dice[idx] = random.randint(1, 10)
+
+        await self._update_result(interaction, new_dice)
+
+    @discord.ui.button(label="Max Crits", style=discord.ButtonStyle.primary, emoji="⭐")
+    async def max_crits_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Re-roll up to 3 failing dice; if fewer than 3 failures, also re-roll successes"""
+        if interaction.user.id != int(self.user_id):
+            await interaction.response.send_message("This isn't your roll!", ephemeral=True)
+            return
+
+        if not await self._check_willpower(interaction):
+            return
+
+        # Find failures (2-5) and successes (6-9) in regular dice
+        failures = [i for i, d in enumerate(self.result.dice) if 2 <= d <= 5]
+        successes = [i for i, d in enumerate(self.result.dice) if 6 <= d <= 9]
+
+        # Priority: failures first, then successes
+        to_reroll = failures[:3]
+        if len(to_reroll) < 3:
+            # Add successes to reach 3
+            remaining = 3 - len(to_reroll)
+            to_reroll.extend(successes[:remaining])
+
+        if not to_reroll:
+            await interaction.response.send_message(
+                f"{HeraldEmojis.WARNING} No dice to re-roll for crits!",
+                ephemeral=True
+            )
+            return
+
+        new_dice = self.result.dice.copy()
+        for idx in to_reroll:
+            new_dice[idx] = random.randint(1, 10)
+
+        await self._update_result(interaction, new_dice)
+
+    @discord.ui.button(label="Avoid Messy", style=discord.ButtonStyle.danger, emoji="💀")
+    async def avoid_messy_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Re-roll tens to attempt to avoid Messy Critical"""
+        if interaction.user.id != int(self.user_id):
+            await interaction.response.send_message("This isn't your roll!", ephemeral=True)
+            return
+
+        if not await self._check_willpower(interaction):
+            return
+
+        # Find tens in regular dice
+        tens = [i for i, d in enumerate(self.result.dice) if d == 10]
+
+        if not tens:
+            await interaction.response.send_message(
+                f"{HeraldEmojis.WARNING} No tens to re-roll!",
+                ephemeral=True
+            )
+            return
+
+        new_dice = self.result.dice.copy()
+        for idx in tens:
+            new_dice[idx] = random.randint(1, 10)
+
+        await self._update_result(interaction, new_dice)
+
+    @discord.ui.button(label="Risky Avoid", style=discord.ButtonStyle.danger, emoji="⚠️")
+    async def risky_avoid_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Re-roll tens; if <3 tens, also re-roll failures"""
+        if interaction.user.id != int(self.user_id):
+            await interaction.response.send_message("This isn't your roll!", ephemeral=True)
+            return
+
+        if not await self._check_willpower(interaction):
+            return
+
+        # Find tens and failures in regular dice
+        tens = [i for i, d in enumerate(self.result.dice) if d == 10]
+        failures = [i for i, d in enumerate(self.result.dice) if 2 <= d <= 5]
+
+        # Re-roll all tens first
+        to_reroll = tens.copy()
+
+        # If fewer than 3 tens, add failures
+        if len(to_reroll) < 3:
+            remaining = 3 - len(to_reroll)
+            to_reroll.extend(failures[:remaining])
+
+        if not to_reroll:
+            await interaction.response.send_message(
+                f"{HeraldEmojis.WARNING} No dice to re-roll!",
+                ephemeral=True
+            )
+            return
+
+        new_dice = self.result.dice.copy()
+        for idx in to_reroll:
+            new_dice[idx] = random.randint(1, 10)
+
+        await self._update_result(interaction, new_dice)
 
 
 def format_dice_result(result: DiceResult, pool_description: str = None,
@@ -298,6 +521,13 @@ class DiceRolling(commands.Cog):
             # Roll the dice
             result = roll_pool(pool, 0, desperation_dice, 0)
 
+            # Get character danger if applicable
+            danger = 0
+            if char_name:
+                char = await find_character(user_id, char_name)
+                if char:
+                    danger = char.get('danger', 0) or 0
+
             # Create description
             pool_parts = []
             pool_parts.append(f"Pool {pool}")
@@ -314,8 +544,21 @@ class DiceRolling(commands.Cog):
                 description = f"{comment}\n{description}"
 
             # Format and send result with character name if available
-            embed = format_dice_result(result, description, char_name, difficulty=difficulty)
-            await interaction.response.send_message(embed=embed)
+            embed = format_dice_result(result, description, char_name, difficulty=difficulty, danger=danger)
+
+            # Create willpower re-roll view (only if character is present)
+            view = None
+            if char_name:
+                view = WillpowerRerollView(
+                    user_id=user_id,
+                    result=result,
+                    character_name=char_name,
+                    difficulty=difficulty,
+                    danger=danger,
+                    pool_description=description
+                )
+
+            await interaction.response.send_message(embed=embed, view=view)
 
             log_desc = f"{comment} - " if comment else ""
             logger.info(f"Manual roll: {log_desc}{description} -> {result.total_successes} successes")
