@@ -86,10 +86,10 @@ class HeraldEmojis:
     _USE_CUSTOM_EMOJIS = os.getenv("USE_CUSTOM_EMOJIS", "true").lower() == "true"
 
     # Custom Discord Emojis (from your server)
-    _CUSTOM_REGULAR_BOTCH = "<:Dice_reg_over:1413720433462612121>"
+    _CUSTOM_REGULAR_BOTCH = "<:Dice_reg_over:1456504429812650067>"
     _CUSTOM_REGULAR_FAILURE = "<:Dice_reg_fail:1413720432527413279>"
-    _CUSTOM_REGULAR_SUCCESS = "<:Dice_reg_succ:1413720435371282463>"
-    _CUSTOM_REGULAR_CRITICAL = "<:Dice_reg_crit:1413720431130705950>"
+    _CUSTOM_REGULAR_SUCCESS = "<:Dice_reg_succ:1456504463773794550>"
+    _CUSTOM_REGULAR_CRITICAL = "<:Dice_reg_crit:1456504355971928318>"
     _CUSTOM_DESPERATION_BOTCH = "<:Dice_des_over:1456489876013977652>"
     _CUSTOM_DESPERATION_FAILURE = "<:Dice_des_fail:1413720425678241862>"
     _CUSTOM_DESPERATION_SUCCESS = "<:Dice_des_succ:1456489958092046457>"
@@ -97,11 +97,11 @@ class HeraldEmojis:
 
     # Unicode Fallback Emojis (always work)
     _UNICODE_REGULAR_BOTCH = "💥"       # 1 - botch/overreach
-    _UNICODE_REGULAR_FAILURE = "⚫"     # 2-5 - failure
+    _UNICODE_REGULAR_FAILURE = "▪️"     # 2-5 - failure
     _UNICODE_REGULAR_SUCCESS = "🎯"     # 6-9 - success
     _UNICODE_REGULAR_CRITICAL = "⭐"    # 10 - critical
     _UNICODE_DESPERATION_BOTCH = "🔥"   # 1 - desperation botch
-    _UNICODE_DESPERATION_FAILURE = "🟠" # 2-5 - desperation failure
+    _UNICODE_DESPERATION_FAILURE = "🔸" # 2-5 - desperation failure
     _UNICODE_DESPERATION_SUCCESS = "🟡" # 6-9 - desperation success
     _UNICODE_DESPERATION_CRITICAL = "✨" # 10 - desperation critical
 
