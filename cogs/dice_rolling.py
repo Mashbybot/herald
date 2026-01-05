@@ -443,7 +443,7 @@ class DiceRolling(commands.Cog):
 
     @app_commands.command(name="roll", description="Roll dice using H5E mechanics")
     @app_commands.describe(
-        pool="Total dice pool to roll",
+        pool="Total dice pool to roll (e.g., '5' or 'Resolve + Medicine')",
         desperate="Use Desperation dice (adds dots from your Desperation track)",
         difficulty="Difficulty (0=Auto, 1=Simple, 2=Standard, 3=Hard, 4=Extreme, 5=Nearly Impossible, 6=Legendary, 7+=Epic)",
         comment="Description of what you're rolling for"
@@ -451,7 +451,7 @@ class DiceRolling(commands.Cog):
     async def roll_dice(
         self,
         interaction: discord.Interaction,
-        pool: int,
+        pool: str,
         desperate: bool = False,
         difficulty: int = 0,
         comment: str = None
@@ -459,10 +459,84 @@ class DiceRolling(commands.Cog):
         """Roll dice using H5E mechanics"""
         user_id = str(interaction.user.id)
 
-        # Validate inputs
-        if pool < 1 or pool > 20:
+        # Parse pool - can be integer or "Attribute + Skill"
+        pool_value = 0
+        pool_description_parts = []
+        attribute_name = None
+        skill_name = None
+
+        # Check if pool contains '+' (Attribute + Skill notation)
+        if '+' in pool:
+            # Parse "Attribute + Skill" format
+            parts = pool.split('+')
+            if len(parts) != 2:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} Invalid format. Use either a number (e.g., '5') or 'Attribute + Skill' (e.g., 'Resolve + Medicine')",
+                    ephemeral=True
+                )
+                return
+
+            attribute_name = parts[0].strip().title()
+            skill_name = parts[1].strip().title()
+
+            # Validate attribute
+            if attribute_name not in H5E_ATTRIBUTES:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} Invalid attribute '{attribute_name}'. Valid attributes: {', '.join(H5E_ATTRIBUTES)}",
+                    ephemeral=True
+                )
+                return
+
+            # Validate skill
+            if skill_name not in ALL_SKILLS:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} Invalid skill '{skill_name}'. Use a valid H5E skill name.",
+                    ephemeral=True
+                )
+                return
+
+            # Get active character to look up values
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No active character set. Use `/character` to select one before rolling with Attribute + Skill notation.",
+                    ephemeral=True
+                )
+                return
+
+            # Look up attribute and skill values
+            attribute_value = await get_character_attribute(user_id, active_char_name, attribute_name)
+            skill_value = await get_character_skill(user_id, active_char_name, skill_name)
+
+            if attribute_value is None:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} Could not find attribute '{attribute_name}' for character {active_char_name}",
+                    ephemeral=True
+                )
+                return
+
+            if skill_value is None:
+                skill_value = 0  # Untrained skill
+
+            pool_value = attribute_value + skill_value
+            pool_description_parts.append(f"{attribute_name} {attribute_value} + {skill_name} {skill_value}")
+        else:
+            # Try to parse as integer
+            try:
+                pool_value = int(pool)
+            except ValueError:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} Invalid pool format. Use either a number (e.g., '5') or 'Attribute + Skill' (e.g., 'Resolve + Medicine')",
+                    ephemeral=True
+                )
+                return
+
+            pool_description_parts.append(f"Pool {pool_value}")
+
+        # Validate pool value
+        if pool_value < 1 or pool_value > 20:
             await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} Pool must be 1-20 dice",
+                f"{HeraldEmojis.ERROR} Pool must be 1-20 dice (calculated pool: {pool_value})",
                 ephemeral=True
             )
             return
@@ -480,8 +554,15 @@ class DiceRolling(commands.Cog):
             char_name = None
             char_desperation = 0
 
+            # If we used Attribute + Skill notation, we already have the active character
+            # Set char_name for willpower buttons to work
+            if attribute_name and skill_name:
+                active_char_name = await get_active_character(user_id)
+                if active_char_name:
+                    char_name = active_char_name
+
             if desperate:
-                # Get active character
+                # Get active character (might already be set from Attribute + Skill parsing)
                 active_char_name = await get_active_character(user_id)
                 if active_char_name:
                     char = await find_character(user_id, active_char_name)
@@ -516,7 +597,7 @@ class DiceRolling(commands.Cog):
                     return
 
             # Roll the dice
-            result = roll_pool(pool, 0, desperation_dice, 0)
+            result = roll_pool(pool_value, 0, desperation_dice, 0)
 
             # Get character danger if applicable
             danger = 0
@@ -525,13 +606,11 @@ class DiceRolling(commands.Cog):
                 if char:
                     danger = char.get('danger', 0) or 0
 
-            # Create description
-            pool_parts = []
-            pool_parts.append(f"Pool {pool}")
+            # Create description using pre-built pool description
             if desperation_dice > 0:
-                pool_parts.append(f"Desperation {desperation_dice}")
+                pool_description_parts.append(f"Desperation {desperation_dice}")
 
-            description = " + ".join(pool_parts) + f" = {pool + desperation_dice} dice"
+            description = " + ".join(pool_description_parts) + f" = {pool_value + desperation_dice} dice"
 
             if difficulty > 0:
                 description += f" vs Difficulty {difficulty}"
