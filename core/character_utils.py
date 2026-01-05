@@ -670,11 +670,38 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
                 # Format: 🔸**Edge Name** - *Description*
                 edge_lines.append(f"🔸 **{edge_name}** - *{edge_desc}*")
 
-            embed.add_field(
-                name="__Edges:__",
-                value="\n".join(edge_lines),
-                inline=False
-            )
+            # Discord has a 1024 character limit per field, so we might need to split
+            edge_display = "\n".join(edge_lines)
+            if len(edge_display) > 1024:
+                # Split into multiple fields
+                chunks = []
+                current_chunk = []
+                current_length = 0
+
+                for edge_line in edge_lines:
+                    if current_length + len(edge_line) + 1 > 1024:
+                        chunks.append("\n".join(current_chunk))
+                        current_chunk = [edge_line]
+                        current_length = len(edge_line)
+                    else:
+                        current_chunk.append(edge_line)
+                        current_length += len(edge_line) + 1
+
+                if current_chunk:
+                    chunks.append("\n".join(current_chunk))
+
+                for i, chunk in enumerate(chunks):
+                    embed.add_field(
+                        name=f"__Edges (Part {i+1}):__" if i > 0 else "__Edges:__",
+                        value=chunk,
+                        inline=False
+                    )
+            else:
+                embed.add_field(
+                    name="__Edges:__",
+                    value=edge_display,
+                    inline=False
+                )
 
         # === PERKS (Edge Abilities) ===
         if perks:
@@ -685,11 +712,38 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
                 # Format: 🔸**Perk Name** - *Description*
                 perk_lines.append(f"🔸 **{perk_name}** - *{perk_desc}*")
 
-            embed.add_field(
-                name="__Perks:__",
-                value="\n".join(perk_lines),
-                inline=False
-            )
+            # Discord has a 1024 character limit per field, so we might need to split
+            perk_display = "\n".join(perk_lines)
+            if len(perk_display) > 1024:
+                # Split into multiple fields
+                chunks = []
+                current_chunk = []
+                current_length = 0
+
+                for perk_line in perk_lines:
+                    if current_length + len(perk_line) + 1 > 1024:
+                        chunks.append("\n".join(current_chunk))
+                        current_chunk = [perk_line]
+                        current_length = len(perk_line)
+                    else:
+                        current_chunk.append(perk_line)
+                        current_length += len(perk_line) + 1
+
+                if current_chunk:
+                    chunks.append("\n".join(current_chunk))
+
+                for i, chunk in enumerate(chunks):
+                    embed.add_field(
+                        name=f"__Perks (Part {i+1}):__" if i > 0 else "__Perks:__",
+                        value=chunk,
+                        inline=False
+                    )
+            else:
+                embed.add_field(
+                    name="__Perks:__",
+                    value=perk_display,
+                    inline=False
+                )
 
         # Footer with helpful tips
         embed.set_footer(text="💡 Use /damage and /heal to manage health • Use /creed and /drive to set your Hunter's path")
