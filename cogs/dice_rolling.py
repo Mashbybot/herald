@@ -1,6 +1,6 @@
 """
 Dice Rolling Cog for Herald Bot - Async Version
-Handles H5E dice mechanics: basic rolls, character rolls, edge dice, desperation
+Handles H5E dice mechanics: basic rolls, character rolls, desperation, danger
 """
 
 import discord
@@ -794,7 +794,93 @@ class DiceRolling(commands.Cog):
         except Exception as e:
             logger.error(f"Error in danger command: {e}")
             await interaction.response.send_message(
-                f"{HeraldEmojis.ERROR} An error occurred while managing Danger rating", 
+                f"{HeraldEmojis.ERROR} An error occurred while managing Danger rating",
+                ephemeral=True
+            )
+
+    @app_commands.command(name="overreach", description="Mark an Overreach - increases Danger by 1")
+    async def overreach_command(
+        self,
+        interaction: discord.Interaction
+    ):
+        """Handle Overreach after rolling desperation 1s on a success"""
+        user_id = str(interaction.user.id)
+
+        try:
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No active character set. Use `/character` to select one.",
+                    ephemeral=True
+                )
+                return
+
+            # Find character using the active character name
+            char = await find_character(user_id, active_char_name)
+            if not char:
+                error_msg = await HeraldMessages.character_not_found(user_id, active_char_name)
+                await interaction.response.send_message(error_msg, ephemeral=True)
+                return
+
+            # Get current danger
+            current_danger = char.get('danger', 0) or 0
+
+            # Increase danger by 1 (capped at 5)
+            new_danger = min(current_danger + 1, 5)
+
+            # Update database with async
+            async with get_async_db() as conn:
+                await conn.execute("""
+                    UPDATE characters
+                    SET danger = $1
+                    WHERE user_id = $2 AND name = $3
+                """, new_danger, user_id, char['name'])
+
+            # Invalidate cache to ensure /sheet shows updated value
+            from core.character_utils import invalidate_character_cache
+            invalidate_character_cache(user_id, char['name'])
+
+            # Create response
+            danger_filled = "🔴" * new_danger
+            danger_empty = "⚫" * (5 - new_danger)
+            danger_bar = f"{danger_filled}{danger_empty}"
+
+            embed = discord.Embed(
+                title=f"💥 Overreach!",
+                description=f"**{char['name']}** pushed too hard with Desperation!\n\nThe supernatural threat grows more dangerous.",
+                color=0xFF4500
+            )
+
+            embed.add_field(
+                name="Danger Increased",
+                value=f"**{current_danger} → {new_danger}** (+1)\n{danger_bar}",
+                inline=False
+            )
+
+            if new_danger < 5:
+                embed.add_field(
+                    name="Effect",
+                    value=f"All rolls now have +{new_danger} difficulty",
+                    inline=False
+                )
+            else:
+                embed.add_field(
+                    name="⚠️ MAXIMUM DANGER!",
+                    value="Danger is at maximum! The supernatural threat is overwhelming.\n"
+                          f"All rolls have +{new_danger} difficulty.",
+                    inline=False
+                )
+
+            embed.set_footer(text="💡 Use /danger to manually adjust Danger rating if needed")
+
+            await interaction.response.send_message(embed=embed)
+            logger.info(f"Overreach for {char['name']}: Danger {current_danger} → {new_danger} (user {user_id})")
+
+        except Exception as e:
+            logger.error(f"Error in overreach command: {e}")
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} An error occurred while processing Overreach",
                 ephemeral=True
             )
 
