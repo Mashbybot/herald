@@ -1,6 +1,8 @@
 import discord
 import logging
 import asyncio
+import signal
+import sys
 from discord.ext import commands
 from config.settings import DISCORD_TOKEN, GUILD_ID, DEBUG_MODE
 from core.db import init_database
@@ -142,8 +144,10 @@ class HeraldBot(commands.Bot):
     async def on_ready(self):
         """Called when the bot has successfully connected to Discord"""
         from config.settings import MAINTENANCE_MODE
+        from core.version import get_version_string, INSTANCE_ID, GIT_BRANCH
 
         self.logger.info(f"🏹 {self.user} has connected to Discord!")
+        self.logger.info(f"🤖 Version: {get_version_string()} | Branch: {GIT_BRANCH} | Instance: {INSTANCE_ID}")
         self.logger.info(f"🆔 Bot ID: {self.user.id}")
         self.logger.info(f"🏰 Guilds: {len(self.guilds)}")
         self.logger.info(f"👥 Users: {len(set(self.get_all_members()))}")
@@ -238,7 +242,8 @@ class HeraldBot(commands.Bot):
 
     async def close(self):
         """Clean shutdown"""
-        self.logger.info("🔄 Shutting down Herald bot...")
+        from core.version import INSTANCE_ID
+        self.logger.info(f"🔄 Shutting down Herald bot (Instance: {INSTANCE_ID})...")
 
         # Close database connections
         from core.db import close_database
@@ -254,18 +259,32 @@ def main():
     """Main entry point for production"""
     # Set up logging
     setup_logging()
-    
-    # Create and run bot
+    logger = logging.getLogger('Herald.Bot')
+
+    # Create bot
     bot = HeraldBot()
-    
+
+    # Set up signal handlers for graceful shutdown
+    def signal_handler(signum, frame):
+        """Handle shutdown signals from Railway or container orchestrator"""
+        sig_name = signal.Signals(signum).name
+        logger.info(f"🛑 Received {sig_name} signal, initiating graceful shutdown...")
+        # Create a task to close the bot gracefully
+        if bot.loop and not bot.loop.is_closed():
+            bot.loop.create_task(bot.close())
+
+    # Register signal handlers (Railway sends SIGTERM on deployment)
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+
     try:
         asyncio.run(bot.start(DISCORD_TOKEN))
     except discord.LoginFailure:
-        logging.getLogger('Herald.Bot').error("❌ Invalid Discord token. Check your environment variables.")
+        logger.error("❌ Invalid Discord token. Check your environment variables.")
     except KeyboardInterrupt:
-        logging.getLogger('Herald.Bot').info("🛑 Bot shutdown requested by user")
+        logger.info("🛑 Bot shutdown requested by user")
     except Exception as e:
-        logging.getLogger('Herald.Bot').error(f"❌ Bot startup failed: {e}")
+        logger.error(f"❌ Bot startup failed: {e}")
 
 
 if __name__ == '__main__':

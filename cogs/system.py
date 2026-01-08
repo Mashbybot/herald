@@ -12,6 +12,7 @@ import platform
 from datetime import datetime
 
 from config.settings import ENVIRONMENT, MAINTENANCE_MODE
+from core.version import get_version_string, INSTANCE_ID, GIT_BRANCH
 
 logger = logging.getLogger('Herald.System')
 
@@ -74,6 +75,14 @@ class System(commands.Cog):
                   f"**Discord.py:** {discord.__version__}\n"
                   f"**Platform:** {platform.system()}",
             inline=True
+        )
+
+        embed.add_field(
+            name="🤖 Bot Version",
+            value=f"**Version:** {get_version_string()}\n"
+                  f"**Branch:** {GIT_BRANCH}\n"
+                  f"**Instance:** `{INSTANCE_ID}`",
+            inline=False
         )
 
         # Add maintenance mode warning if active
