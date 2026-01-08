@@ -163,4 +163,8 @@ async def start_health_server(port: int = 8080):
     logger.info(f"🏥 Health check server started on http://0.0.0.0:{port}")
     logger.info(f"   Endpoints: /health /ready /metrics")
 
+    # Log port source for debugging Railway issues
+    port_source = "PORT env var" if os.getenv('PORT') else "default"
+    logger.info(f"   Port {port} from {port_source}")
+
     return runner

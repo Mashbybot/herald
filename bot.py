@@ -67,7 +67,9 @@ class HeraldBot(commands.Bot):
         from core.health import start_health_server, set_bot_instance
         import os
 
-        health_port = int(os.getenv('HEALTH_PORT', '8080'))
+        # Railway expects PORT env variable for web services
+        # Try PORT first (Railway), then HEALTH_PORT, then default to 8080
+        health_port = int(os.getenv('PORT', os.getenv('HEALTH_PORT', '8080')))
         try:
             self.health_runner = await start_health_server(port=health_port)
             set_bot_instance(self)
