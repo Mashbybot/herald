@@ -44,30 +44,51 @@ def setup_logging():
 
 class HeraldBot(commands.Bot):
     """Herald - Hunter: The Reckoning 5E Discord Bot - Production Ready"""
-    
+
     def __init__(self):
         # Set up intents
         intents = discord.Intents.default()
         intents.message_content = True  # Required for message content access
-        
+
         super().__init__(
             command_prefix='!',  # Legacy prefix (slash commands are primary)
             intents=intents,
             help_command=None  # Disable default help (we have custom /help)
         )
-        
+
         self.logger = logging.getLogger('Herald.Bot')
+        self.health_runner = None  # Will store the health check server runner
 
     async def setup_hook(self):
         """Called when the bot is starting up"""
         self.logger.info("🏹 Starting Herald bot setup...")
+
+        # Start health check server first (so Railway can monitor startup)
+        from core.health import start_health_server, set_bot_instance
+        import os
+
+        health_port = int(os.getenv('HEALTH_PORT', '8080'))
+        try:
+            self.health_runner = await start_health_server(port=health_port)
+            set_bot_instance(self)
+        except Exception as e:
+            self.logger.warning(f"⚠️ Could not start health check server: {e}")
+
+        # Test database connectivity first
+        try:
+            from core.db import test_database_connection
+            await test_database_connection()
+            self.logger.info("✅ Database connection verified")
+        except Exception as e:
+            self.logger.error(f"❌ Database connection test failed: {e}", exc_info=True)
+            raise
 
         # Initialize database
         try:
             await init_database()
             self.logger.info("✅ Database initialized successfully")
         except Exception as e:
-            self.logger.error(f"❌ Database initialization failed: {e}")
+            self.logger.error(f"❌ Database initialization failed: {e}", exc_info=True)
             raise
 
         # Ensure H5E columns exist (migration for existing databases)
@@ -76,7 +97,7 @@ class HeraldBot(commands.Bot):
             await ensure_h5e_columns()
             self.logger.info("✅ H5E database schema verified")
         except Exception as e:
-            self.logger.error(f"❌ H5E schema verification failed: {e}")
+            self.logger.error(f"❌ H5E schema verification failed: {e}", exc_info=True)
             raise
 
         # Load all cogs
@@ -89,8 +110,15 @@ class HeraldBot(commands.Bot):
             'cogs.dice_rolling',
         ]
 
+        # Define critical cogs that must load successfully
+        critical_cogs = {
+            'cogs.character_management',
+            'cogs.dice_rolling'
+        }
+
         loaded_cogs = 0
         failed_cogs = 0
+        failed_critical_cogs = []
 
         for cog in cogs_to_load:
             try:
@@ -98,10 +126,18 @@ class HeraldBot(commands.Bot):
                 self.logger.info(f"✅ Loaded {cog}")
                 loaded_cogs += 1
             except Exception as e:
-                self.logger.error(f"❌ Failed to load {cog}: {e}")
+                self.logger.error(f"❌ Failed to load {cog}: {e}", exc_info=True)
                 failed_cogs += 1
+                if cog in critical_cogs:
+                    failed_critical_cogs.append(cog)
 
         self.logger.info(f"📦 Cog loading complete: {loaded_cogs} loaded, {failed_cogs} failed")
+
+        # Fail startup if critical cogs didn't load
+        if failed_critical_cogs:
+            error_msg = f"Critical cogs failed to load: {', '.join(failed_critical_cogs)}"
+            self.logger.critical(f"❌ {error_msg}")
+            raise RuntimeError(error_msg)
 
         # Sync commands - manually clear Discord's cache to force parameter updates
         try:
@@ -122,6 +158,14 @@ class HeraldBot(commands.Bot):
                 # Now sync new command signatures
                 synced = await self.tree.sync(guild=guild)
                 self.logger.info(f"⚡ Synced {len(synced)} NEW commands to guild {GUILD_ID} (instant)")
+
+                # Verify sync was successful
+                if not synced:
+                    raise RuntimeError("Command sync returned empty list - sync failed")
+
+                # Log synced command names for verification
+                command_names = [cmd.name for cmd in synced]
+                self.logger.info(f"✅ Registered commands: {', '.join(command_names)}")
             else:
                 # Production mode - sync globally (may take up to 1 hour)
                 self.logger.info(f"🧹 Clearing old global commands from Discord API...")
@@ -136,21 +180,47 @@ class HeraldBot(commands.Bot):
                 # Now sync new command signatures
                 synced = await self.tree.sync()
                 self.logger.info(f"🌍 Synced {len(synced)} NEW commands globally")
+
+                # Verify sync was successful
+                if not synced:
+                    raise RuntimeError("Global command sync returned empty list - sync failed")
+
+                # Log synced command names for verification
+                command_names = [cmd.name for cmd in synced]
+                self.logger.info(f"✅ Registered commands: {', '.join(command_names)}")
                 self.logger.warning(f"⏰ Global command sync can take up to 1 hour to propagate to all servers")
+
         except Exception as e:
-            self.logger.error(f"❌ Command sync failed: {e}")
-            self.logger.error(f"Full error: {type(e).__name__}: {str(e)}")
+            self.logger.error(f"❌ Command sync failed: {e}", exc_info=True)
+            raise  # Make command sync failure fatal
 
     async def on_ready(self):
         """Called when the bot has successfully connected to Discord"""
         from config.settings import MAINTENANCE_MODE
         from core.version import get_version_string, INSTANCE_ID, GIT_BRANCH
+        from core.health import set_ready
+        import os
 
         self.logger.info(f"🏹 {self.user} has connected to Discord!")
         self.logger.info(f"🤖 Version: {get_version_string()} | Branch: {GIT_BRANCH} | Instance: {INSTANCE_ID}")
         self.logger.info(f"🆔 Bot ID: {self.user.id}")
         self.logger.info(f"🏰 Guilds: {len(self.guilds)}")
         self.logger.info(f"👥 Users: {len(set(self.get_all_members()))}")
+
+        # Mark bot as ready for health checks
+        set_ready(True)
+
+        # Create readiness marker for health checks
+        try:
+            os.makedirs('/tmp', exist_ok=True)
+            with open('/tmp/herald_ready', 'w') as f:
+                f.write(f"{INSTANCE_ID}\n{get_version_string()}")
+            self.logger.info("✅ Readiness marker created at /tmp/herald_ready")
+        except Exception as e:
+            self.logger.warning(f"⚠️ Could not create readiness marker: {e}")
+
+        # Log structured startup complete message for monitoring
+        self.logger.info(f"STARTUP_COMPLETE version={get_version_string()} instance={INSTANCE_ID} guilds={len(self.guilds)}")
 
         # Start rotating presence messages (respects maintenance mode)
         self.loop.create_task(self.rotate_presence())
@@ -193,7 +263,7 @@ class HeraldBot(commands.Bot):
                 await asyncio.sleep(300)  # 5 minutes
 
             except Exception as e:
-                self.logger.error(f"Error rotating presence: {e}")
+                self.logger.error(f"Error rotating presence: {e}", exc_info=True)
                 await asyncio.sleep(60)  # Wait 1 minute on error before retrying
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -214,23 +284,34 @@ class HeraldBot(commands.Bot):
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: Exception):
         """Global error handler for slash commands"""
-        self.logger.error(f"❌ Command error in {interaction.command}: {error}")
-        
+        self.logger.error(
+            f"❌ Command error in {interaction.command}: {error}",
+            exc_info=True,
+            extra={
+                "user_id": interaction.user.id,
+                "guild_id": interaction.guild_id,
+                "command": interaction.command.name if interaction.command else "unknown"
+            }
+        )
+
         # Try to respond to the user
         try:
             if not interaction.response.is_done():
                 await interaction.response.send_message(
-                    "⚠️ An error occurred while processing your command. Please try again.", 
+                    "⚠️ An error occurred while processing your command. Please try again.",
                     ephemeral=True
                 )
             else:
                 await interaction.followup.send(
-                    "⚠️ An error occurred while processing your command. Please try again.", 
+                    "⚠️ An error occurred while processing your command. Please try again.",
                     ephemeral=True
                 )
-        except:
-            # If we can't respond, just log it
-            self.logger.error(f"❌ Could not send error message to user for command {interaction.command}")
+        except Exception as e:
+            # If we can't respond, log it with details
+            self.logger.error(
+                f"❌ Could not send error message to user for command {interaction.command}",
+                exc_info=True
+            )
 
     async def on_guild_join(self, guild):
         """Called when the bot joins a new guild"""
@@ -243,14 +324,29 @@ class HeraldBot(commands.Bot):
     async def close(self):
         """Clean shutdown"""
         from core.version import INSTANCE_ID
+        from core.health import set_ready
+
         self.logger.info(f"🔄 Shutting down Herald bot (Instance: {INSTANCE_ID})...")
+
+        # Mark as not ready for health checks
+        set_ready(False)
+
+        # Close health check server
+        if self.health_runner:
+            try:
+                await self.health_runner.cleanup()
+                self.logger.info("✅ Health check server stopped")
+            except Exception as e:
+                self.logger.error(f"❌ Error stopping health check server: {e}")
 
         # Close database connections
         from core.db import close_database
         try:
-            await close_database()
+            await asyncio.wait_for(close_database(), timeout=5.0)
+        except asyncio.TimeoutError:
+            self.logger.error("❌ Database close timed out - force closing")
         except Exception as e:
-            self.logger.error(f"❌ Error closing database: {e}")
+            self.logger.error(f"❌ Error closing database: {e}", exc_info=True)
 
         await super().close()
 
@@ -281,10 +377,13 @@ def main():
         asyncio.run(bot.start(DISCORD_TOKEN))
     except discord.LoginFailure:
         logger.error("❌ Invalid Discord token. Check your environment variables.")
+        sys.exit(1)  # Exit code 1: Authentication failure
     except KeyboardInterrupt:
         logger.info("🛑 Bot shutdown requested by user")
+        sys.exit(0)  # Exit code 0: Clean shutdown
     except Exception as e:
-        logger.error(f"❌ Bot startup failed: {e}")
+        logger.error(f"❌ Bot startup failed: {e}", exc_info=True)
+        sys.exit(2)  # Exit code 2: Startup failure
 
 
 if __name__ == '__main__':

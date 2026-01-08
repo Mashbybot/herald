@@ -1,6 +1,7 @@
 # core/db.py - PostgreSQL async database layer
 
 import asyncpg
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from config.settings import DATABASE_URL
@@ -10,6 +11,33 @@ logger = logging.getLogger('Herald.Database')
 
 # Connection pool for PostgreSQL
 _pool = None
+
+async def test_database_connection():
+    """Test database connectivity before full initialization"""
+    global _pool
+
+    logger.info("🔍 Testing database connection...")
+
+    try:
+        # Create a temporary connection with short timeout
+        conn = await asyncpg.connect(DATABASE_URL, timeout=5.0)
+
+        # Run a simple query to verify connectivity
+        result = await conn.fetchval("SELECT 1")
+
+        if result != 1:
+            raise RuntimeError("Database connectivity test failed: unexpected result")
+
+        # Check PostgreSQL version for logging
+        version = await conn.fetchval("SELECT version()")
+        logger.info(f"✅ Database connection successful: {version.split(',')[0]}")
+
+        await conn.close()
+
+    except asyncio.TimeoutError:
+        raise RuntimeError("Database connection timed out after 5 seconds")
+    except Exception as e:
+        raise RuntimeError(f"Database connection failed: {e}")
 
 async def init_database():
     """Initialize PostgreSQL database connection and run migrations"""
