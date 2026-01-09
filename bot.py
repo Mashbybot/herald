@@ -104,7 +104,7 @@ class HeraldBot(commands.Bot):
 
         # Load all cogs
         cogs_to_load = [
-            # 'cogs.system',  # Removed - Railway provides monitoring
+            'cogs.system',  # Re-enabled - users need /status and /ping commands
             'cogs.character_management',
             'cogs.character_gameplay',
             'cogs.character_progression',
