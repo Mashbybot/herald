@@ -690,13 +690,13 @@ class DiceRolling(commands.Cog):
             # Handle different actions
             if action == "view":
                 danger_filled = "🔴" * current_danger
-                danger_empty = "⚫" * (5 - current_danger)
+                danger_empty = "⚫" * (10 - current_danger)
                 danger_bar = f"{danger_filled}{danger_empty}"
-                
+
                 embed = discord.Embed(
-                    title=f"⚠️ {char['name']}'s Danger",
-                    description=f"**Current Rating:** {current_danger}/5\n{danger_bar}",
-                    color=0xFF4500 if current_danger >= 4 else 0xFFD700 if current_danger >= 2 else 0x4169E1
+                    title=f"🔸 {char['name']}'s Danger",
+                    description=f"**Current Rating:** {current_danger}/10\n{danger_bar}",
+                    color=0xFF4500 if current_danger >= 7 else 0xFFD700 if current_danger >= 4 else 0x4169E1
                 )
                 
                 embed.add_field(
@@ -725,7 +725,7 @@ class DiceRolling(commands.Cog):
                         ephemeral=True
                     )
                     return
-                new_danger = max(0, min(amount, 5))
+                new_danger = max(0, min(amount, 10))
             elif action == "add":
                 if amount is None:
                     await interaction.response.send_message(
@@ -733,7 +733,7 @@ class DiceRolling(commands.Cog):
                         ephemeral=True
                     )
                     return
-                new_danger = max(0, min(current_danger + amount, 5))
+                new_danger = max(0, min(current_danger + amount, 10))
             else:  # subtract
                 if amount is None:
                     await interaction.response.send_message(
@@ -758,24 +758,19 @@ class DiceRolling(commands.Cog):
             # Create response
             change = new_danger - current_danger
             change_text = f"+{change}" if change > 0 else str(change) if change < 0 else "±0"
-            
+
             danger_filled = "🔴" * new_danger
-            danger_empty = "⚫" * (5 - new_danger)
+            danger_empty = "⚫" * (10 - new_danger)
             danger_bar = f"{danger_filled}{danger_empty}"
-            
+
             embed = discord.Embed(
-                title=f"⚠️ {char['name']}'s Danger Updated",
-                description=f"**{current_danger} → {new_danger}** ({change_text})",
+                title=f"🔸 Danger Updated",
+                description=f"**{current_danger} → {new_danger}** ({change_text})\n\n{danger_bar} `{new_danger}/10`",
                 color=0xFF4500 if new_danger >= 4 else 0xFFD700 if new_danger >= 2 else 0x4169E1
             )
-            
-            embed.add_field(
-                name="New Rating",
-                value=f"**{new_danger}/5**\n{danger_bar}",
-                inline=False
-            )
-            
-            if new_danger >= 4 and current_danger < 4:
+
+
+            if new_danger >= 7 and current_danger < 7:
                 embed.add_field(
                     name="⚠️ High Danger!",
                     value="Your character is now in extreme supernatural peril!",

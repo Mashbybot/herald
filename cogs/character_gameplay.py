@@ -744,9 +744,13 @@ class CharacterGameplay(commands.Cog):
             # Create response
             desperation_bar = create_desperation_bar(new_desperation)
 
+            # Calculate change
+            change = new_desperation - current_desperation
+            change_text = f"+{change}" if change > 0 else str(change) if change < 0 else "±0"
+
             embed = discord.Embed(
-                title=f"{HeraldEmojis.DESPERATION} Desperation Updated",
-                description=f"{HeraldMessages.PATTERN_LOGGED}: Risk increases with reward\n\n{desperation_bar}",
+                title=f"🔸 Desperation Updated",
+                description=f"**{current_desperation} → {new_desperation}** ({change_text})\n\n{desperation_bar} `{new_desperation}/10`",
                 color=0x8B0000 if new_desperation >= 7 else 0xFF4500 if new_desperation >= 4 else 0x4169E1
             )
 
