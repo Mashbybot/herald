@@ -401,7 +401,7 @@ async def character_not_found_message(user_id: str, character_name: str) -> str:
             names = "**, **".join(user_characters)
             suggestion = f"\nAnalysis: Your Hunters: **{names}**"
         else:
-            suggestion = f"\nAnalysis: Use `/characters` to see your {len(user_characters)} Hunters"
+            suggestion = f"\nAnalysis: Use `/character` to see your {len(user_characters)} Hunters"
     else:
         suggestion = f"\nAnalysis: Create your first Hunter with `/create name:\"Character Name\"`"
 
