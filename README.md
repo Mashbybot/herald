@@ -8,9 +8,23 @@ Herald is a comprehensive Discord bot designed specifically for Hunter: The Reck
 
 ## 🔸 Add Herald to Your Server
 
-**[→ Invite Herald to Discord](https://discord.com/oauth2/authorize?client_id=1388202365198270595)**
+<div align="center">
 
-Get started in under 5 minutes. No setup required. Just add Herald and start hunting.
+### **[📥 Invite Herald to Your Server](https://discord.com/oauth2/authorize?client_id=1388202365198270595)**
+
+[![Invite Herald](https://img.shields.io/badge/Add%20to%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/oauth2/authorize?client_id=1388202365198270595)
+
+*Get started in under 5 minutes. No setup required. Just add Herald and start hunting.*
+
+---
+
+### Need Help or Want to Report Issues?
+
+[![Join Support Server](https://img.shields.io/badge/Support%20Server-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/BJde7UDUTf)
+
+*Get help from the community, report bugs, and suggest features*
+
+</div>
 
 ---
 
@@ -167,7 +181,7 @@ Herald is community-driven and welcomes contributions from H5E players and devel
 
 **How to Contribute:**
 - Report bugs and suggest features on [GitHub Issues](https://github.com/Mashbybot/herald/issues)
-- Join the [Support Discord](https://discord.gg/9bEZk6ARG9) to discuss development
+- Join the [Support Discord](https://discord.gg/BJde7UDUTf) to discuss development
 - Submit pull requests (please discuss major changes first)
 
 **Development Credits:**
@@ -185,7 +199,7 @@ Free to use, modify, and distribute. Built for the Hunter community.
 
 ## 🤝 Community & Support
 
-**[Support Discord Server](https://discord.gg/9bEZk6ARG9)** - Get help, report bugs, suggest features
+**[Support Discord Server](https://discord.gg/BJde7UDUTf)** - Get help, report bugs, suggest features
 
 ---
 
