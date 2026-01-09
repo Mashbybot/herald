@@ -412,28 +412,28 @@ class CharacterManagement(commands.Cog):
             # Physical attributes
             embed.add_field(
                 name="Physical",
-                value=f"💪 Strength: {strength}\n🤸 Dexterity: {dexterity}\n❤️ Stamina: {stamina}",
+                value=f"**Strength:** {strength}\n**Dexterity:** {dexterity}\n**Stamina:** {stamina}",
                 inline=True
             )
 
             # Social attributes
             embed.add_field(
                 name="Social",
-                value=f"✨ Charisma: {charisma}\n🎭 Manipulation: {manipulation}\n🧘 Composure: {composure}",
+                value=f"**Charisma:** {charisma}\n**Manipulation:** {manipulation}\n**Composure:** {composure}",
                 inline=True
             )
 
             # Mental attributes
             embed.add_field(
                 name="Mental",
-                value=f"🧠 Intelligence: {intelligence}\n⚡ Wits: {wits}\n🎯 Resolve: {resolve}",
+                value=f"**Intelligence:** {intelligence}\n**Wits:** {wits}\n**Resolve:** {resolve}",
                 inline=True
             )
 
             # Derived stats
             embed.add_field(
                 name="Derived Stats",
-                value=f"❤️ Health: {health}\n💙 Willpower: {willpower}",
+                value=f"**Health:** {health}\n**Willpower:** {willpower}",
                 inline=False
             )
 
