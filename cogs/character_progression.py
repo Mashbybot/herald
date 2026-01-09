@@ -11,7 +11,7 @@ import logging
 
 from core.db import get_async_db
 from core.character_utils import find_character, character_autocomplete, ALL_SKILLS, resolve_character, get_active_character
-from core.ui_utils import HeraldColors, HeraldMessages
+from core.ui_utils import HeraldColors, HeraldMessages, HeraldEmojis
 from config.settings import GUILD_ID
 
 logger = logging.getLogger('Herald.Character.Progression')
@@ -130,15 +130,28 @@ class CharacterProgression(commands.Cog):
 
     # ===== SKILL COMMANDS =====
 
+    async def skill_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
+        """Autocomplete for skill names with fuzzy matching"""
+        if not current:
+            # Return first 25 skills if nothing typed
+            return [app_commands.Choice(name=skill, value=skill) for skill in ALL_SKILLS[:25]]
+
+        # Case-insensitive fuzzy matching
+        current_lower = current.lower()
+        matches = [
+            skill for skill in ALL_SKILLS
+            if current_lower in skill.lower()
+        ]
+
+        # Return up to 25 matches (Discord limit)
+        return [app_commands.Choice(name=skill, value=skill) for skill in matches[:25]]
+
     @app_commands.command(name="skill_set", description="Set dots for a skill on your character")
     @app_commands.describe(
         skill="Skill to update",
         dots="Skill rating (0-5)"
     )
-    @app_commands.choices(skill=[
-        app_commands.Choice(name=skill, value=skill)
-        for skill in ALL_SKILLS[:25]  # Discord limit
-    ])
+    @app_commands.autocomplete(skill=skill_autocomplete)
     async def skill_set(
         self,
         interaction: discord.Interaction,
@@ -166,6 +179,24 @@ class CharacterProgression(commands.Cog):
                     ephemeral=True
                 )
                 return
+
+            # Normalize skill name (case-insensitive matching)
+            normalized_skill = None
+            skill_lower = skill.lower()
+            for valid_skill in ALL_SKILLS:
+                if valid_skill.lower() == skill_lower:
+                    normalized_skill = valid_skill
+                    break
+
+            if not normalized_skill:
+                await interaction.response.send_message(
+                    f"❌ Invalid skill name: **{skill}**",
+                    ephemeral=True
+                )
+                return
+
+            # Use normalized skill name for database operations
+            skill = normalized_skill
 
             async with get_async_db() as conn:
                 # Update skill
@@ -208,6 +239,7 @@ class CharacterProgression(commands.Cog):
         app_commands.Choice(name="Add", value="add"),
         app_commands.Choice(name="Remove", value="remove")
     ])
+    @app_commands.autocomplete(skill=skill_autocomplete)
     async def specialty(
         self,
         interaction: discord.Interaction,
@@ -281,7 +313,25 @@ class CharacterProgression(commands.Cog):
                     ephemeral=True
                 )
                 return
-            
+
+            # Normalize skill name (case-insensitive matching)
+            normalized_skill = None
+            skill_lower = skill.lower()
+            for valid_skill in ALL_SKILLS:
+                if valid_skill.lower() == skill_lower:
+                    normalized_skill = valid_skill
+                    break
+
+            if not normalized_skill:
+                await interaction.response.send_message(
+                    f"❌ Invalid skill name: **{skill}**. Use `/skill_set` to see valid skills.",
+                    ephemeral=True
+                )
+                return
+
+            # Use normalized skill name for all database operations
+            skill = normalized_skill
+
             async with get_async_db() as conn:
                 if action == "add":
                     # Check if skill has dots
