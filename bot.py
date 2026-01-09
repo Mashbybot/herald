@@ -143,21 +143,39 @@ class HeraldBot(commands.Bot):
 
         # Sync commands - manually clear Discord's cache to force parameter updates
         try:
+            # ALWAYS clear global commands first (in case old global commands exist)
+            self.logger.info(f"🧹 Clearing ALL old global commands from Discord API...")
+            try:
+                global_commands = await self.tree.fetch_commands()
+                for cmd in global_commands:
+                    try:
+                        await self.http.delete_global_command(cmd.id)
+                        self.logger.info(f"   🗑️ Deleted global command: {cmd.name}")
+                    except Exception as e:
+                        self.logger.warning(f"   ⚠️ Could not delete global command {cmd.name}: {e}")
+                self.logger.info(f"🗑️ Removed {len(global_commands)} old global commands from Discord")
+            except Exception as e:
+                self.logger.warning(f"⚠️ Could not fetch/delete global commands: {e}")
+
             if GUILD_ID:
                 # Development mode - sync to specific guild (instant updates)
                 guild = discord.Object(id=GUILD_ID)
 
-                # Manually clear all commands from Discord's API first
-                self.logger.info(f"🧹 Clearing old commands from Discord API...")
-                current_commands = await self.tree.fetch_commands(guild=guild)
-                for cmd in current_commands:
-                    try:
-                        await self.http.delete_guild_command(GUILD_ID, cmd.id)
-                    except:
-                        pass
-                self.logger.info(f"🗑️ Removed {len(current_commands)} old commands from Discord")
+                # Clear all guild-specific commands
+                self.logger.info(f"🧹 Clearing old guild commands from Discord API (Guild {GUILD_ID})...")
+                try:
+                    current_commands = await self.tree.fetch_commands(guild=guild)
+                    for cmd in current_commands:
+                        try:
+                            await self.http.delete_guild_command(GUILD_ID, cmd.id)
+                            self.logger.info(f"   🗑️ Deleted guild command: {cmd.name}")
+                        except Exception as e:
+                            self.logger.warning(f"   ⚠️ Could not delete guild command {cmd.name}: {e}")
+                    self.logger.info(f"🗑️ Removed {len(current_commands)} old guild commands from Discord")
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Could not fetch/delete guild commands: {e}")
 
-                # Now sync new command signatures
+                # Now sync new command signatures to guild
                 synced = await self.tree.sync(guild=guild)
                 self.logger.info(f"⚡ Synced {len(synced)} NEW commands to guild {GUILD_ID} (instant)")
 
@@ -170,16 +188,9 @@ class HeraldBot(commands.Bot):
                 self.logger.info(f"✅ Registered commands: {', '.join(command_names)}")
             else:
                 # Production mode - sync globally (may take up to 1 hour)
-                self.logger.info(f"🧹 Clearing old global commands from Discord API...")
-                current_commands = await self.tree.fetch_commands()
-                for cmd in current_commands:
-                    try:
-                        await self.http.delete_global_command(cmd.id)
-                    except:
-                        pass
-                self.logger.info(f"🗑️ Removed {len(current_commands)} old global commands from Discord")
+                # Global commands were already cleared above
 
-                # Now sync new command signatures
+                # Now sync new command signatures globally
                 synced = await self.tree.sync()
                 self.logger.info(f"🌍 Synced {len(synced)} NEW commands globally")
 
