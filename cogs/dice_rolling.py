@@ -626,7 +626,6 @@ class DiceRolling(commands.Cog):
             embed = format_dice_result(result, description, char_name, difficulty=difficulty, danger=danger)
 
             # Create willpower re-roll view (only if character is present)
-            view = None
             if char_name:
                 view = WillpowerRerollView(
                     user_id=user_id,
@@ -636,8 +635,9 @@ class DiceRolling(commands.Cog):
                     danger=danger,
                     pool_description=description
                 )
-
-            await interaction.response.send_message(embed=embed, view=view)
+                await interaction.response.send_message(embed=embed, view=view)
+            else:
+                await interaction.response.send_message(embed=embed)
 
             log_desc = f"{comment} - " if comment else ""
             logger.info(f"Manual roll: {log_desc}{description} -> {result.total_successes} successes")
