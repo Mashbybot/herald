@@ -409,6 +409,10 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
                 inline=False
             )
 
+    # === STEP 11: Add helpful footer for non-character rolls ===
+    if not character_name:
+        embed.set_footer(text="💡 Create a character with /create to unlock Willpower re-rolls")
+
     return embed
 
 
