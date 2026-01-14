@@ -368,44 +368,6 @@ async def character_autocomplete(interaction: discord.Interaction, current: str)
         return []
 
 
-# ===== MESSAGE SYSTEM EXTENSIONS =====
-
-async def character_not_found_message(user_id: str, character_name: str) -> str:
-    """Enhanced character not found message with Herald's analytical voice"""
-    # Import here to avoid circular dependency
-    from core.ui_utils import HeraldMessages
-
-    cache_key = f"user_chars:{user_id}"
-    user_characters = _character_cache.get(cache_key)
-
-    if user_characters is None:
-        try:
-            from core.db import get_async_db
-            async with get_async_db() as conn:
-                rows = await conn.fetch(
-                    "SELECT name FROM characters WHERE user_id = $1 ORDER BY name",
-                    user_id
-                )
-                user_characters = [row['name'] for row in rows]
-                _character_cache.set(cache_key, user_characters)
-        except Exception as e:
-            logger.error(f"Error getting user characters: {e}")
-            user_characters = []
-
-    base_msg = f"{HeraldMessages.QUERY_FAILED}: No Hunter matches pattern \"{character_name}\""
-
-    if user_characters:
-        if len(user_characters) == 1:
-            suggestion = f"\nAnalysis: Did you mean **{user_characters[0]}**?"
-        elif len(user_characters) <= 3:
-            names = "**, **".join(user_characters)
-            suggestion = f"\nAnalysis: Your Hunters: **{names}**"
-        else:
-            suggestion = f"\nAnalysis: Use `/character` to see your {len(user_characters)} Hunters"
-    else:
-        suggestion = f"\nAnalysis: Create your first Hunter with `/create name:\"Character Name\"`"
-
-    return base_msg + suggestion
 
 
 async def ensure_h5e_columns():
@@ -758,34 +720,3 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
             description="Unable to display character sheet properly",
             color=0x8B0000
         )
-
-
-# ===== BACKWARD COMPATIBILITY ALIASES =====
-
-# For existing code that expects HeraldMessages in character_utils
-class HeraldMessages:
-    """Legacy compatibility - import from ui_utils instead"""
-    
-    @staticmethod
-    async def character_not_found(user_id: str, character_name: str) -> str:
-        return await character_not_found_message(user_id, character_name)
-    
-    @staticmethod 
-    def xp_insufficient(needed: int, available: int, improvement: str) -> str:
-        from core.ui_utils import HeraldMessages as UIMessages
-        return UIMessages.xp_insufficient(needed, available, improvement)
-    
-    @staticmethod
-    def skill_at_maximum(skill_name: str, current_dots: int) -> str:
-        from core.ui_utils import HeraldMessages as UIMessages
-        return UIMessages.skill_at_maximum(skill_name, current_dots)
-    
-    @staticmethod
-    def operation_success(title: str, description: str) -> str:
-        from core.ui_utils import HeraldMessages as UIMessages
-        return UIMessages.operation_success(title, description)
-    
-    @staticmethod
-    def operation_failed(title: str, error: str, suggestion: str = None) -> str:
-        from core.ui_utils import HeraldMessages as UIMessages
-        return UIMessages.operation_failed(title, error, suggestion)

@@ -10,7 +10,7 @@ from typing import List, Optional
 import logging
 import random
 
-from core.dice import roll_pool, simple_roll, roll_rouse_check, DiceResult
+from core.dice import roll_pool, DiceResult
 from core.dice_utils import (
     get_die_emoji, format_dice_display, get_result_color, 
     create_success_description, format_margin_display, sort_dice_for_display
@@ -796,15 +796,27 @@ class DiceRolling(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="overreach", description="Mark an Overreach - increases Danger by 1")
+    @app_commands.command(name="overreach", description="Mark an Overreach - increases Danger")
+    @app_commands.describe(
+        amount="Amount of Danger to add (default: 1, typically equals desperation 1s rolled)"
+    )
     async def overreach_command(
         self,
-        interaction: discord.Interaction
+        interaction: discord.Interaction,
+        amount: int = 1
     ):
         """Handle Overreach after rolling desperation 1s on a success"""
         user_id = str(interaction.user.id)
 
         try:
+            # Validate amount
+            if amount < 1 or amount > 10:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} Amount must be between 1 and 10",
+                    ephemeral=True
+                )
+                return
+
             # Get active character
             active_char_name = await get_active_character(user_id)
             if not active_char_name:
@@ -824,8 +836,8 @@ class DiceRolling(commands.Cog):
             # Get current danger
             current_danger = char.get('danger', 0) or 0
 
-            # Increase danger by 1 (capped at 5)
-            new_danger = min(current_danger + 1, 5)
+            # Increase danger by amount (capped at 10)
+            new_danger = min(current_danger + amount, 10)
 
             # Update database with async
             async with get_async_db() as conn:
@@ -839,9 +851,12 @@ class DiceRolling(commands.Cog):
             from core.character_utils import invalidate_character_cache
             invalidate_character_cache(user_id, char['name'])
 
+            # Calculate actual change
+            change = new_danger - current_danger
+
             # Create response
             danger_filled = "🔴" * new_danger
-            danger_empty = "⚫" * (5 - new_danger)
+            danger_empty = "⚫" * (10 - new_danger)
             danger_bar = f"{danger_filled}{danger_empty}"
 
             embed = discord.Embed(
@@ -852,11 +867,11 @@ class DiceRolling(commands.Cog):
 
             embed.add_field(
                 name="Danger Increased",
-                value=f"**{current_danger} → {new_danger}** (+1)\n{danger_bar}",
+                value=f"**{current_danger} → {new_danger}** (+{change})\n{danger_bar} `{new_danger}/10`",
                 inline=False
             )
 
-            if new_danger < 5:
+            if new_danger < 10:
                 embed.add_field(
                     name="Effect",
                     value=f"All rolls now have +{new_danger} difficulty",

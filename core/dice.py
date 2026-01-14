@@ -79,37 +79,3 @@ def roll_pool(attribute: int, skill: int, desperation: int = 0,
         desperation_dice = [random.randint(1, 10) for _ in range(desperation)]
 
     return DiceResult(base_dice, desperation_dice)
-
-def roll_rouse_check() -> Dict[str, Any]:
-    """
-    Roll a rouse check for desperation escalation
-    1-5: Success (no desperation gain)
-    6-10: Failure (gain 1 desperation)
-    """
-    die = random.randint(1, 10)
-    success = die <= 5
-    
-    return {
-        "die": die,
-        "success": success,
-        "desperation_gained": 0 if success else 1
-    }
-
-def simple_roll(pool_size: int) -> Dict[str, Any]:
-    """
-    Simple dice pool roll without H5E specific mechanics
-    Useful for basic rolls or non-Hunter systems
-    """
-    if pool_size < 1:
-        pool_size = 1
-    
-    dice = [random.randint(1, 10) for _ in range(pool_size)]
-    successes = sum(1 for die in dice if die >= 6)
-    crits = dice.count(10) // 2
-    
-    return {
-        "dice": dice,
-        "successes": successes + crits,
-        "crits": crits,
-        "total_successes": successes + crits
-    }

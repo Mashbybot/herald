@@ -401,3 +401,33 @@ class HeraldMessages:
         if suggestion:
             msg += f"\n💡 {suggestion}"
         return msg
+
+    @staticmethod
+    async def character_not_found(user_id: str, character_name: str) -> str:
+        """Enhanced character not found message with character suggestions"""
+        # Import to avoid circular dependency
+        from core.db import get_async_db
+
+        # Get user's characters
+        try:
+            async with get_async_db() as conn:
+                rows = await conn.fetch(
+                    "SELECT name FROM characters WHERE user_id = $1 ORDER BY name",
+                    user_id
+                )
+                user_characters = [row['name'] for row in rows]
+        except Exception:
+            user_characters = []
+
+        if not user_characters:
+            return (
+                f"{HeraldEmojis.ERROR} Character **{character_name}** not found.\n"
+                f"💡 You haven't created any characters yet. Use `/create` to create one."
+            )
+        else:
+            char_list = ", ".join(f"`{c}`" for c in user_characters)
+            return (
+                f"{HeraldEmojis.ERROR} Character **{character_name}** not found.\n"
+                f"📋 Your characters: {char_list}\n"
+                f"💡 Use `/character` to select an active character."
+            )
