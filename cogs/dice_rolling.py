@@ -556,9 +556,19 @@ class DiceRolling(commands.Cog):
             char_desperation = 0
 
             # Always try to get active character for willpower reroll buttons
+            # If no active character but user has exactly 1 character, use that one
             active_char_name = await get_active_character(user_id)
             if active_char_name:
                 char_name = active_char_name
+            else:
+                # Check if user has exactly 1 character - auto-select it
+                async with get_async_db() as conn:
+                    user_chars = await conn.fetch(
+                        "SELECT name FROM characters WHERE user_id = $1",
+                        user_id
+                    )
+                    if len(user_chars) == 1:
+                        char_name = user_chars[0]['name']
 
             if desperate:
                 # Need active character for desperation
