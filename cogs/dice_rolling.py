@@ -269,13 +269,15 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
     """Format dice result in clean Inconnu-style layout"""
 
     # === STEP 1: Calculate core values ===
-    margin = result.total_successes - difficulty
+    # Margin includes danger in the calculation (danger increases effective difficulty)
+    actual_difficulty = difficulty + danger
+    margin = result.total_successes - actual_difficulty
 
     # === STEP 1.5: Check for automatic despair ===
     # Automatic despair = failed roll + desperation 1s
     is_automatic_despair = False
     if result.has_overreach:
-        is_win = result.total_successes >= difficulty if difficulty > 0 else result.total_successes > 0
+        is_win = result.total_successes >= actual_difficulty if actual_difficulty > 0 else result.total_successes > 0
         is_automatic_despair = not is_win
 
     # === STEP 2: Get formatted components ===
@@ -284,7 +286,7 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
         color = 0x8B0000  # Dark red for despair
     else:
         # Check if roll failed (negative margin means didn't meet difficulty)
-        if difficulty > 0 and margin < 0:
+        if actual_difficulty > 0 and margin < 0:
             success_text = "FAILURE"
             color = HeraldEmojis.COLOR_TOTAL_FAILURE
         else:
@@ -297,7 +299,7 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
     if is_automatic_despair:
         # Automatic despair uses overreach thumbnail
         thumbnail_url = THUMBNAIL_URLS.get("overreach")
-    elif difficulty > 0 and margin < 0:
+    elif actual_difficulty > 0 and margin < 0:
         # Failed to meet difficulty
         thumbnail_url = THUMBNAIL_URLS.get("failure")
     elif result.has_overreach or result.messy_critical:
@@ -333,7 +335,7 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
         embed.add_field(name="", value=f"*{comment_text}*", inline=False)
 
     # === STEP 5: Margin ===
-    if difficulty > 0:
+    if actual_difficulty > 0:
         embed.add_field(name="Margin", value=str(margin), inline=False)
 
     # === STEP 6: Dice display ===
@@ -355,10 +357,9 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
         values.append(str(len(result.desperation_dice)))
 
     # Difficulty
-    if difficulty > 0:
-        actual_diff = difficulty + danger if danger > 0 else difficulty
+    if actual_difficulty > 0:
         headers.append("Difficulty")
-        values.append(str(actual_diff))
+        values.append(str(actual_difficulty))
 
     if headers:
         # Create table-like layout with proper spacing
@@ -385,7 +386,7 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
     # === STEP 10: Overreach/Despair warnings ===
     if result.has_overreach:
         # Check if this is a win or loss situation
-        is_win = result.total_successes >= difficulty if difficulty > 0 else result.total_successes > 0
+        is_win = result.total_successes >= actual_difficulty if actual_difficulty > 0 else result.total_successes > 0
 
         if is_win:
             # Win condition - player chooses Overreach or Despair
@@ -554,44 +555,46 @@ class DiceRolling(commands.Cog):
             char_name = None
             char_desperation = 0
 
-            # If we used Attribute + Skill notation, we already have the active character
-            # Set char_name for willpower buttons to work
-            if attribute_name and skill_name:
-                active_char_name = await get_active_character(user_id)
-                if active_char_name:
-                    char_name = active_char_name
+            # Always try to get active character for willpower reroll buttons
+            active_char_name = await get_active_character(user_id)
+            if active_char_name:
+                char_name = active_char_name
 
             if desperate:
-                # Get active character (might already be set from Attribute + Skill parsing)
-                active_char_name = await get_active_character(user_id)
-                if active_char_name:
-                    char = await find_character(user_id, active_char_name)
-                    if char:
-                        char_name = char['name']
-                        char_desperation = char.get('desperation', 0) or 0
-
-                        # Check if in despair
-                        in_despair = char.get('in_despair', False) or False
-                        if in_despair:
-                            await interaction.response.send_message(
-                                f"{HeraldEmojis.ERROR} **{char['name']}** is in Despair!\n"
-                                f"💀 Drive is unusable until redeemed.\n"
-                                f"🕊️ Redemption: {char.get('redemption', 'Not set')}",
-                                ephemeral=True
-                            )
-                            return
-
-                        if char_desperation > 0:
-                            desperation_dice = char_desperation
-                        else:
-                            await interaction.response.send_message(
-                                f"{HeraldEmojis.ERROR} {char['name']} has no Desperation to use!",
-                                ephemeral=True
-                            )
-                            return
-                else:
+                # Need active character for desperation
+                if not char_name:
                     await interaction.response.send_message(
                         f"{HeraldEmojis.ERROR} No active character set. Use `/character` to select one before using desperate rolls.",
+                        ephemeral=True
+                    )
+                    return
+
+                char = await find_character(user_id, char_name)
+                if char:
+                    char_desperation = char.get('desperation', 0) or 0
+
+                    # Check if in despair
+                    in_despair = char.get('in_despair', False) or False
+                    if in_despair:
+                        await interaction.response.send_message(
+                            f"{HeraldEmojis.ERROR} **{char['name']}** is in Despair!\n"
+                            f"💀 Drive is unusable until redeemed.\n"
+                            f"🕊️ Redemption: {char.get('redemption', 'Not set')}",
+                            ephemeral=True
+                        )
+                        return
+
+                    if char_desperation > 0:
+                        desperation_dice = char_desperation
+                    else:
+                        await interaction.response.send_message(
+                            f"{HeraldEmojis.ERROR} {char['name']} has no Desperation to use!",
+                            ephemeral=True
+                        )
+                        return
+                else:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Character not found!",
                         ephemeral=True
                     )
                     return
