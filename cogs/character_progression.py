@@ -790,6 +790,27 @@ class CharacterProgression(commands.Cog):
             )
 
             embed.add_field(
+                name="🔸 Creating Your Hunter (Quick Start)",
+                value=(
+                    "**1. Create Character:** `/create name:\"Your Name\" concept:\"Your Concept\" creed:Faithful`\n"
+                    "   • Sets up your Hunter with a name, concept, and Creed\n\n"
+                    "**2. Set Attributes:** `/attributes attribute:Strength dots:3`\n"
+                    "   • Physical: Strength, Dexterity, Stamina\n"
+                    "   • Social: Charisma, Manipulation, Composure\n"
+                    "   • Mental: Intelligence, Wits, Resolve\n\n"
+                    "**3. Set Skills:** `/skill_set skill:Investigation dots:3`\n"
+                    "   • Set all your skill dots (0-5 per skill)\n\n"
+                    "**4. Define Purpose:** `/drive drive:\"Protect the Innocent\" redemption:\"Save someone I failed\"`\n"
+                    "   • Drive is your core motivation\n"
+                    "   • Redemption is your path back from Despair\n\n"
+                    "**5. Set Goals:** `/ambition text:\"Your long-term goal\"` and `/desire text:\"Your short-term goal\"`\n\n"
+                    "**6. View Sheet:** `/sheet` - See your complete Hunter dossier!\n\n"
+                    "💡 Use `/help topic:Character Management` for detailed character options"
+                ),
+                inline=False
+            )
+
+            embed.add_field(
                 name="🔸 Operations available",
                 value=(
                     "1. Create a character: `/create`\n"
