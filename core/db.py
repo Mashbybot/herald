@@ -233,6 +233,42 @@ async def run_postgresql_migrations():
             END $$;
         """)
 
+        # Advantages table (character benefits)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS advantages (
+                id SERIAL PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                character_name TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                is_predefined BOOLEAN DEFAULT FALSE,
+                effect_type TEXT,
+                effect_value INTEGER,
+                effect_condition TEXT,
+                created_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(user_id, character_name, name),
+                FOREIGN KEY (user_id, character_name) REFERENCES characters(user_id, name) ON DELETE CASCADE
+            );
+        """)
+
+        # Flaws table (character complications)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS flaws (
+                id SERIAL PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                character_name TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                is_predefined BOOLEAN DEFAULT FALSE,
+                effect_type TEXT,
+                effect_value INTEGER,
+                effect_condition TEXT,
+                created_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(user_id, character_name, name),
+                FOREIGN KEY (user_id, character_name) REFERENCES characters(user_id, name) ON DELETE CASCADE
+            );
+        """)
+
         # User settings table (active character tracking)
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS user_settings (
