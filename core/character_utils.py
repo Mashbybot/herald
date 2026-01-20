@@ -264,6 +264,36 @@ async def get_character_perks(user_id: str, character_name: str) -> List[Dict[st
         return []
 
 
+async def get_character_advantages(user_id: str, character_name: str) -> List[Dict[str, Any]]:
+    """Get character's Advantages."""
+    try:
+        from core.db import get_async_db
+        async with get_async_db() as conn:
+            advantage_rows = await conn.fetch(
+                "SELECT name, description, is_predefined, effect_type, effect_value, effect_condition FROM advantages WHERE user_id = $1 AND character_name = $2 ORDER BY name",
+                user_id, character_name
+            )
+            return [dict(row) for row in advantage_rows]
+    except Exception as e:
+        logger.error(f"Error getting advantages for '{character_name}' (user {user_id}): {e}")
+        return []
+
+
+async def get_character_flaws(user_id: str, character_name: str) -> List[Dict[str, Any]]:
+    """Get character's Flaws."""
+    try:
+        from core.db import get_async_db
+        async with get_async_db() as conn:
+            flaw_rows = await conn.fetch(
+                "SELECT name, description, is_predefined, effect_type, effect_value, effect_condition FROM flaws WHERE user_id = $1 AND character_name = $2 ORDER BY name",
+                user_id, character_name
+            )
+            return [dict(row) for row in flaw_rows]
+    except Exception as e:
+        logger.error(f"Error getting flaws for '{character_name}' (user {user_id}): {e}")
+        return []
+
+
 async def get_character_attribute(user_id: str, character_name: str, attribute: str) -> Optional[int]:
     """Get character attribute with caching and validation."""
     from core.constants import VALID_ATTRIBUTES
