@@ -451,7 +451,8 @@ def invalidate_character_cache(user_id: str, character_name: str = None):
 # ===== ENHANCED CHARACTER SHEET CREATION =====
 
 def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict[str, Any]],
-                                   edges: List[Dict[str, Any]] = None, perks: List[Dict[str, Any]] = None) -> discord.Embed:
+                                   edges: List[Dict[str, Any]] = None, perks: List[Dict[str, Any]] = None,
+                                   advantages: List[Dict[str, Any]] = None, flaws: List[Dict[str, Any]] = None) -> discord.Embed:
     """Create an enhanced character sheet with full validation and error handling."""
     # Import here to avoid circular dependency
     from core.ui_utils import HeraldEmojis, create_health_bar, create_willpower_bar, create_desperation_bar, create_danger_bar, create_skill_display
@@ -459,6 +460,8 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
     # Default to empty lists if not provided
     edges = edges or []
     perks = perks or []
+    advantages = advantages or []
+    flaws = flaws or []
 
     try:
         name = character.get('name', 'Unknown')
@@ -734,6 +737,104 @@ def create_enhanced_character_sheet(character: Dict[str, Any], skills: List[Dict
                 embed.add_field(
                     name="__Perks:__",
                     value=perk_display,
+                    inline=False
+                )
+
+        # === ADVANTAGES (Beneficial traits) ===
+        if advantages:
+            advantage_lines = []
+            for advantage in advantages:
+                adv_name = advantage.get('name', 'Unknown')
+                adv_desc = advantage.get('description', 'No description available')
+                # Show if it's mechanical or narrative
+                effect_type = advantage.get('effect_type')
+                if effect_type:
+                    effect_condition = advantage.get('effect_condition', '')
+                    effect_value = advantage.get('effect_value')
+                    effect_text = f" ({effect_condition}" + (f" {effect_value:+d}" if effect_value else "") + ")"
+                    advantage_lines.append(f"✨ **{adv_name}** - *{adv_desc}*{effect_text}")
+                else:
+                    advantage_lines.append(f"✨ **{adv_name}** - *{adv_desc}*")
+
+            # Discord has a 1024 character limit per field
+            advantage_display = "\n".join(advantage_lines)
+            if len(advantage_display) > 1024:
+                # Split into multiple fields
+                chunks = []
+                current_chunk = []
+                current_length = 0
+
+                for adv_line in advantage_lines:
+                    if current_length + len(adv_line) + 1 > 1024:
+                        chunks.append("\n".join(current_chunk))
+                        current_chunk = [adv_line]
+                        current_length = len(adv_line)
+                    else:
+                        current_chunk.append(adv_line)
+                        current_length += len(adv_line) + 1
+
+                if current_chunk:
+                    chunks.append("\n".join(current_chunk))
+
+                for i, chunk in enumerate(chunks):
+                    embed.add_field(
+                        name=f"__Advantages (Part {i+1}):__" if i > 0 else "__Advantages:__",
+                        value=chunk,
+                        inline=False
+                    )
+            else:
+                embed.add_field(
+                    name="__Advantages:__",
+                    value=advantage_display,
+                    inline=False
+                )
+
+        # === FLAWS (Complications) ===
+        if flaws:
+            flaw_lines = []
+            for flaw in flaws:
+                flaw_name = flaw.get('name', 'Unknown')
+                flaw_desc = flaw.get('description', 'No description available')
+                # Show if it's mechanical or narrative
+                effect_type = flaw.get('effect_type')
+                if effect_type:
+                    effect_condition = flaw.get('effect_condition', '')
+                    effect_value = flaw.get('effect_value')
+                    effect_text = f" ({effect_condition}" + (f" {effect_value:+d}" if effect_value else "") + ")"
+                    flaw_lines.append(f"⚠️ **{flaw_name}** - *{flaw_desc}*{effect_text}")
+                else:
+                    flaw_lines.append(f"⚠️ **{flaw_name}** - *{flaw_desc}*")
+
+            # Discord has a 1024 character limit per field
+            flaw_display = "\n".join(flaw_lines)
+            if len(flaw_display) > 1024:
+                # Split into multiple fields
+                chunks = []
+                current_chunk = []
+                current_length = 0
+
+                for flaw_line in flaw_lines:
+                    if current_length + len(flaw_line) + 1 > 1024:
+                        chunks.append("\n".join(current_chunk))
+                        current_chunk = [flaw_line]
+                        current_length = len(flaw_line)
+                    else:
+                        current_chunk.append(flaw_line)
+                        current_length += len(flaw_line) + 1
+
+                if current_chunk:
+                    chunks.append("\n".join(current_chunk))
+
+                for i, chunk in enumerate(chunks):
+                    embed.add_field(
+                        name=f"__Flaws (Part {i+1}):__" if i > 0 else "__Flaws:__",
+                        value=chunk,
+                        inline=False
+                    )
+            else:
+                embed.add_field(
+                    name="__Flaws:__",
+                    value=flaw_display,
                     inline=False
                 )
 

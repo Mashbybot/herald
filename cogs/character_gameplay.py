@@ -1989,6 +1989,486 @@ class CharacterGameplay(commands.Cog):
                 ephemeral=True
             )
 
+    @app_commands.command(name="advantage", description="Manage your character's Advantages (Merits and Backgrounds)")
+    @app_commands.describe(
+        action="What to do with advantages",
+        advantage_name="Advantage name (for add/remove actions)",
+        custom_description="Custom description (for custom advantages only)"
+    )
+    @app_commands.choices(
+        action=[
+            app_commands.Choice(name="View All Predefined", value="view"),
+            app_commands.Choice(name="Add Predefined", value="add"),
+            app_commands.Choice(name="Add Custom", value="custom"),
+            app_commands.Choice(name="Remove", value="remove")
+        ]
+    )
+    async def advantage(self, interaction: discord.Interaction, action: str, advantage_name: str = None, custom_description: str = None):
+        """Manage character Advantages (beneficial traits)"""
+
+        user_id = str(interaction.user.id)
+
+        try:
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
+                return
+
+            char = await find_character(user_id, active_char_name)
+            if not char:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} Could not find your active character.",
+                    ephemeral=True
+                )
+                return
+
+            if action == "view":
+                # Show all available advantages (reference list)
+                from data.advantages_flaws import MERITS, BACKGROUNDS
+
+                embed = discord.Embed(
+                    title=f"✨ All Advantages",
+                    description="Browse predefined Merits and Backgrounds. Use `/sheet` to see your character's current Advantages.",
+                    color=0x00CED1  # Turquoise
+                )
+
+                # Merits
+                merit_list = []
+                for merit_name, merit_data in sorted(list(MERITS.items())[:10]):  # Limit to 10 for readability
+                    dots = merit_data['dots']
+                    merit_list.append(f"• **{merit_name}** ({'•' * dots if isinstance(dots, int) else dots})")
+
+                if merit_list:
+                    embed.add_field(
+                        name="📚 Merits",
+                        value='\n'.join(merit_list),
+                        inline=False
+                    )
+
+                # Backgrounds
+                background_list = []
+                for bg_name, bg_data in sorted(list(BACKGROUNDS.items())[:10]):  # Limit to 10
+                    dots = bg_data['dots']
+                    background_list.append(f"• **{bg_name}** ({'•' * dots if isinstance(dots, int) else dots})")
+
+                if background_list:
+                    embed.add_field(
+                        name="🌐 Backgrounds",
+                        value='\n'.join(background_list),
+                        inline=False
+                    )
+
+                embed.set_footer(text="Use /advantage action:Add to add a predefined advantage • /advantage action:Custom to create your own")
+                await interaction.response.send_message(embed=embed)
+
+            elif action == "add":
+                # Add a predefined advantage
+                if not advantage_name:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Please specify the advantage name to add",
+                        ephemeral=True
+                    )
+                    return
+
+                # Get advantage from data
+                from data.advantages_flaws import ALL_ADVANTAGES
+                advantage_data = ALL_ADVANTAGES.get(advantage_name)
+
+                if not advantage_data:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} **{advantage_name}** is not a valid predefined advantage",
+                        ephemeral=True
+                    )
+                    return
+
+                async with get_async_db() as conn:
+                    # Check if advantage already exists
+                    existing = await conn.fetchrow(
+                        "SELECT name FROM advantages WHERE user_id = $1 AND character_name = $2 AND name = $3",
+                        user_id, char['name'], advantage_name
+                    )
+
+                    if existing:
+                        await interaction.response.send_message(
+                            f"{HeraldEmojis.ERROR} **{char['name']}** already has the **{advantage_name}** advantage!",
+                            ephemeral=True
+                        )
+                        return
+
+                    # Add the advantage
+                    await conn.execute(
+                        """INSERT INTO advantages (user_id, character_name, name, description, is_predefined, effect_type, effect_value, effect_condition)
+                           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
+                        user_id, char['name'], advantage_name, advantage_data['description'],
+                        True, advantage_data.get('effect_type'), advantage_data.get('effect_value'), advantage_data.get('effect_condition')
+                    )
+
+                # Invalidate cache
+                from core.character_utils import invalidate_character_cache
+                invalidate_character_cache(user_id, char['name'])
+
+                embed = discord.Embed(
+                    title=f"✨ Advantage Added",
+                    description=f"**{char['name']}** gained the **{advantage_name}** advantage",
+                    color=0x00CED1
+                )
+
+                dots_display = f" ({'•' * advantage_data['dots']})" if isinstance(advantage_data['dots'], int) else f" ({advantage_data['dots']})"
+                embed.add_field(
+                    name=f"{advantage_name}{dots_display}",
+                    value=advantage_data['description'],
+                    inline=False
+                )
+
+                if advantage_data.get('effect_type'):
+                    effect_text = f"**Effect:** {advantage_data.get('effect_condition', 'General')}"
+                    if advantage_data.get('effect_value'):
+                        effect_text += f" ({advantage_data['effect_value']:+d})"
+                    embed.add_field(name="Mechanical Effect", value=effect_text, inline=False)
+
+                await interaction.response.send_message(embed=embed)
+                logger.info(f"Added advantage '{advantage_name}' to {char['name']} (user {user_id})")
+
+            elif action == "custom":
+                # Add a custom advantage
+                if not advantage_name:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Please specify the custom advantage name",
+                        ephemeral=True
+                    )
+                    return
+
+                if not custom_description:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Please provide a description for your custom advantage",
+                        ephemeral=True
+                    )
+                    return
+
+                async with get_async_db() as conn:
+                    # Check if advantage already exists
+                    existing = await conn.fetchrow(
+                        "SELECT name FROM advantages WHERE user_id = $1 AND character_name = $2 AND name = $3",
+                        user_id, char['name'], advantage_name
+                    )
+
+                    if existing:
+                        await interaction.response.send_message(
+                            f"{HeraldEmojis.ERROR} **{char['name']}** already has an advantage named **{advantage_name}**!",
+                            ephemeral=True
+                        )
+                        return
+
+                    # Add the custom advantage
+                    await conn.execute(
+                        """INSERT INTO advantages (user_id, character_name, name, description, is_predefined, effect_type, effect_value, effect_condition)
+                           VALUES ($1, $2, $3, $4, $5, NULL, NULL, NULL)""",
+                        user_id, char['name'], advantage_name, custom_description, False
+                    )
+
+                # Invalidate cache
+                from core.character_utils import invalidate_character_cache
+                invalidate_character_cache(user_id, char['name'])
+
+                embed = discord.Embed(
+                    title=f"✨ Custom Advantage Added",
+                    description=f"**{char['name']}** gained the **{advantage_name}** advantage",
+                    color=0x00CED1
+                )
+
+                embed.add_field(
+                    name=advantage_name,
+                    value=custom_description,
+                    inline=False
+                )
+
+                await interaction.response.send_message(embed=embed)
+                logger.info(f"Added custom advantage '{advantage_name}' to {char['name']} (user {user_id})")
+
+            elif action == "remove":
+                # Remove advantage
+                if not advantage_name:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Please specify the advantage name to remove",
+                        ephemeral=True
+                    )
+                    return
+
+                async with get_async_db() as conn:
+                    result = await conn.execute(
+                        "DELETE FROM advantages WHERE user_id = $1 AND character_name = $2 AND name = $3",
+                        user_id, char['name'], advantage_name
+                    )
+
+                    # Invalidate cache
+                    from core.character_utils import invalidate_character_cache
+                    invalidate_character_cache(user_id, char['name'])
+
+                    # Check if anything was deleted
+                    if result == "DELETE 0":
+                        await interaction.response.send_message(
+                            f"{HeraldEmojis.ERROR} Advantage **{advantage_name}** not found",
+                            ephemeral=True
+                        )
+                        return
+
+                    embed = discord.Embed(
+                        title=f"🗑️ Advantage Removed",
+                        description=f"**{char['name']}** lost the **{advantage_name}** advantage",
+                        color=0xFF4500
+                    )
+
+                    await interaction.response.send_message(embed=embed)
+                    logger.info(f"Removed advantage '{advantage_name}' from {char['name']} (user {user_id})")
+
+        except Exception as e:
+            self.logger.error(f"Error in advantage command: {e}")
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Error managing advantages",
+                ephemeral=True
+            )
+
+    @app_commands.command(name="flaw", description="Manage your character's Flaws (ongoing problems)")
+    @app_commands.describe(
+        action="What to do with flaws",
+        flaw_name="Flaw name (for add/remove actions)",
+        custom_description="Custom description (for custom flaws only)"
+    )
+    @app_commands.choices(
+        action=[
+            app_commands.Choice(name="View All Predefined", value="view"),
+            app_commands.Choice(name="Add Predefined", value="add"),
+            app_commands.Choice(name="Add Custom", value="custom"),
+            app_commands.Choice(name="Remove", value="remove")
+        ]
+    )
+    async def flaw(self, interaction: discord.Interaction, action: str, flaw_name: str = None, custom_description: str = None):
+        """Manage character Flaws (complications and challenges)"""
+
+        user_id = str(interaction.user.id)
+
+        try:
+            # Get active character
+            active_char_name = await get_active_character(user_id)
+            if not active_char_name:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} No active character set. Use `/character` to set your active character.",
+                    ephemeral=True
+                )
+                return
+
+            char = await find_character(user_id, active_char_name)
+            if not char:
+                await interaction.response.send_message(
+                    f"{HeraldEmojis.ERROR} Could not find your active character.",
+                    ephemeral=True
+                )
+                return
+
+            if action == "view":
+                # Show all available flaws (reference list)
+                from data.advantages_flaws import FLAWS
+
+                embed = discord.Embed(
+                    title=f"⚠️ All Flaws",
+                    description="Browse predefined Flaws. Use `/sheet` to see your character's current Flaws.",
+                    color=0xFF6347  # Tomato red
+                )
+
+                # Show first 20 flaws
+                flaw_list = []
+                for flaw_nm, flaw_data in sorted(list(FLAWS.items())[:20]):
+                    dots = flaw_data['dots']
+                    flaw_list.append(f"• **{flaw_nm}** ({'•' * dots if isinstance(dots, int) else dots})")
+
+                if flaw_list:
+                    # Split into two columns if needed
+                    mid = len(flaw_list) // 2
+                    embed.add_field(
+                        name="Flaws (Part 1)",
+                        value='\n'.join(flaw_list[:mid]),
+                        inline=True
+                    )
+                    embed.add_field(
+                        name="Flaws (Part 2)",
+                        value='\n'.join(flaw_list[mid:]),
+                        inline=True
+                    )
+
+                embed.set_footer(text="Use /flaw action:Add to add a predefined flaw • /flaw action:Custom to create your own")
+                await interaction.response.send_message(embed=embed)
+
+            elif action == "add":
+                # Add a predefined flaw
+                if not flaw_name:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Please specify the flaw name to add",
+                        ephemeral=True
+                    )
+                    return
+
+                # Get flaw from data
+                from data.advantages_flaws import FLAWS
+                flaw_data = FLAWS.get(flaw_name)
+
+                if not flaw_data:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} **{flaw_name}** is not a valid predefined flaw",
+                        ephemeral=True
+                    )
+                    return
+
+                async with get_async_db() as conn:
+                    # Check if flaw already exists
+                    existing = await conn.fetchrow(
+                        "SELECT name FROM flaws WHERE user_id = $1 AND character_name = $2 AND name = $3",
+                        user_id, char['name'], flaw_name
+                    )
+
+                    if existing:
+                        await interaction.response.send_message(
+                            f"{HeraldEmojis.ERROR} **{char['name']}** already has the **{flaw_name}** flaw!",
+                            ephemeral=True
+                        )
+                        return
+
+                    # Add the flaw
+                    await conn.execute(
+                        """INSERT INTO flaws (user_id, character_name, name, description, is_predefined, effect_type, effect_value, effect_condition)
+                           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
+                        user_id, char['name'], flaw_name, flaw_data['description'],
+                        True, flaw_data.get('effect_type'), flaw_data.get('effect_value'), flaw_data.get('effect_condition')
+                    )
+
+                # Invalidate cache
+                from core.character_utils import invalidate_character_cache
+                invalidate_character_cache(user_id, char['name'])
+
+                embed = discord.Embed(
+                    title=f"⚠️ Flaw Added",
+                    description=f"**{char['name']}** gained the **{flaw_name}** flaw",
+                    color=0xFF6347
+                )
+
+                dots_display = f" ({'•' * flaw_data['dots']})" if isinstance(flaw_data['dots'], int) else f" ({flaw_data['dots']})"
+                embed.add_field(
+                    name=f"{flaw_name}{dots_display}",
+                    value=flaw_data['description'],
+                    inline=False
+                )
+
+                if flaw_data.get('effect_type'):
+                    effect_text = f"**Effect:** {flaw_data.get('effect_condition', 'General')}"
+                    if flaw_data.get('effect_value'):
+                        effect_text += f" ({flaw_data['effect_value']:+d})"
+                    embed.add_field(name="Mechanical Effect", value=effect_text, inline=False)
+
+                await interaction.response.send_message(embed=embed)
+                logger.info(f"Added flaw '{flaw_name}' to {char['name']} (user {user_id})")
+
+            elif action == "custom":
+                # Add a custom flaw
+                if not flaw_name:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Please specify the custom flaw name",
+                        ephemeral=True
+                    )
+                    return
+
+                if not custom_description:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Please provide a description for your custom flaw",
+                        ephemeral=True
+                    )
+                    return
+
+                async with get_async_db() as conn:
+                    # Check if flaw already exists
+                    existing = await conn.fetchrow(
+                        "SELECT name FROM flaws WHERE user_id = $1 AND character_name = $2 AND name = $3",
+                        user_id, char['name'], flaw_name
+                    )
+
+                    if existing:
+                        await interaction.response.send_message(
+                            f"{HeraldEmojis.ERROR} **{char['name']}** already has a flaw named **{flaw_name}**!",
+                            ephemeral=True
+                        )
+                        return
+
+                    # Add the custom flaw
+                    await conn.execute(
+                        """INSERT INTO flaws (user_id, character_name, name, description, is_predefined, effect_type, effect_value, effect_condition)
+                           VALUES ($1, $2, $3, $4, $5, NULL, NULL, NULL)""",
+                        user_id, char['name'], flaw_name, custom_description, False
+                    )
+
+                # Invalidate cache
+                from core.character_utils import invalidate_character_cache
+                invalidate_character_cache(user_id, char['name'])
+
+                embed = discord.Embed(
+                    title=f"⚠️ Custom Flaw Added",
+                    description=f"**{char['name']}** gained the **{flaw_name}** flaw",
+                    color=0xFF6347
+                )
+
+                embed.add_field(
+                    name=flaw_name,
+                    value=custom_description,
+                    inline=False
+                )
+
+                await interaction.response.send_message(embed=embed)
+                logger.info(f"Added custom flaw '{flaw_name}' to {char['name']} (user {user_id})")
+
+            elif action == "remove":
+                # Remove flaw
+                if not flaw_name:
+                    await interaction.response.send_message(
+                        f"{HeraldEmojis.ERROR} Please specify the flaw name to remove",
+                        ephemeral=True
+                    )
+                    return
+
+                async with get_async_db() as conn:
+                    result = await conn.execute(
+                        "DELETE FROM flaws WHERE user_id = $1 AND character_name = $2 AND name = $3",
+                        user_id, char['name'], flaw_name
+                    )
+
+                    # Invalidate cache
+                    from core.character_utils import invalidate_character_cache
+                    invalidate_character_cache(user_id, char['name'])
+
+                    # Check if anything was deleted
+                    if result == "DELETE 0":
+                        await interaction.response.send_message(
+                            f"{HeraldEmojis.ERROR} Flaw **{flaw_name}** not found",
+                            ephemeral=True
+                        )
+                        return
+
+                    embed = discord.Embed(
+                        title=f"🗑️ Flaw Removed",
+                        description=f"**{char['name']}** no longer has the **{flaw_name}** flaw",
+                        color=0xFF4500
+                    )
+
+                    await interaction.response.send_message(embed=embed)
+                    logger.info(f"Removed flaw '{flaw_name}' from {char['name']} (user {user_id})")
+
+        except Exception as e:
+            self.logger.error(f"Error in flaw command: {e}")
+            await interaction.response.send_message(
+                f"{HeraldEmojis.ERROR} Error managing flaws",
+                ephemeral=True
+            )
+
     # ===== HELPER METHODS FOR ROLL INTEGRATION =====
 
     async def get_character_attribute(self, user_id: str, character_name: str, attribute: str) -> Optional[int]:

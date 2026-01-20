@@ -579,11 +579,13 @@ class CharacterManagement(commands.Cog):
         user_id = str(interaction.user.id)
 
         try:
-            # Import the enhanced character sheet creator and edge/perk fetchers
+            # Import the enhanced character sheet creator and edge/perk/advantage/flaw fetchers
             from core.character_utils import (
                 create_enhanced_character_sheet,
                 get_character_edges,
-                get_character_perks
+                get_character_perks,
+                get_character_advantages,
+                get_character_flaws
             )
 
             # Get active character
@@ -605,12 +607,14 @@ class CharacterManagement(commands.Cog):
                 )
                 return
 
-            # Get edges and perks
+            # Get edges, perks, advantages, and flaws
             edges = await get_character_edges(user_id, character['name'])
             perks = await get_character_perks(user_id, character['name'])
+            advantages = await get_character_advantages(user_id, character['name'])
+            flaws = await get_character_flaws(user_id, character['name'])
 
             # Create enhanced character sheet with all features
-            embed = create_enhanced_character_sheet(character, skills, edges, perks)
+            embed = create_enhanced_character_sheet(character, skills, edges, perks, advantages, flaws)
 
             await interaction.response.send_message(embed=embed)
 
