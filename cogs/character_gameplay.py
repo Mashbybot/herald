@@ -12,7 +12,7 @@ import logging
 from core.db import get_async_db
 from core.character_utils import (
     find_character, character_autocomplete, get_character_and_skills,
-    ensure_h5e_columns, ALL_SKILLS, H5E_SKILLS, HeraldMessages, resolve_character,
+    ensure_h5e_columns, ALL_SKILLS, H5E_SKILLS, resolve_character,
     get_active_character
 )
 from core.ui_utils import (
