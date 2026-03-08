@@ -356,10 +356,15 @@ def format_dice_result(result: DiceResult, pool_description: str = None,
         headers.append("Desperation")
         values.append(str(len(result.desperation_dice)))
 
-    # Difficulty
-    if actual_difficulty > 0:
+    # Difficulty - show base difficulty and danger as separate columns so the
+    # +danger contribution is visible to the user rather than silently inflating
+    # the displayed difficulty number.
+    if difficulty > 0:
         headers.append("Difficulty")
-        values.append(str(actual_difficulty))
+        values.append(str(difficulty))
+    if danger > 0:
+        headers.append("Danger")
+        values.append(f"+{danger}")
 
     if headers:
         # Create table-like layout with proper spacing
